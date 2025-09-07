@@ -1,0 +1,42 @@
+@page "/Account/Logout"
+@* @rendermode InteractiveServer *@
+
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Authentication.Cookies
+
+@using Blazored.LocalStorage
+@inject ILocalStorageService _localStorageService
+
+@inject NavigationManager NavigationManager
+@inject blazorWpBooking.Components.Account.CircuitTokenStore TokenStore
+@inject AuthenticationStateProvider _authenticationStateProvider
+@inject IHttpContextAccessor HttpContextAccessor
+
+<h1>Logout</h1>
+<p> Processing... </p>
+
+<LogoutInteractive />
+
+@code
+{
+
+    protected override async Task OnInitializedAsync()
+    {
+       
+            ((WordPressRevalidatingAuthenticationStateProvider)_authenticationStateProvider).MarkUserLoggedOut();
+
+            await HttpContextAccessor.HttpContext!.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+    }
+
+    @* protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+
+            await _localStorageService.RemoveItemAsync("authToken");
+
+            NavigationManager.NavigateTo("/Account/Login", true);
+        }
+    } *@
+
+}

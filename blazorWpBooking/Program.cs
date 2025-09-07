@@ -1,12 +1,14 @@
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+using blazorWpBooking.Components.Account;
 using Microsoft.EntityFrameworkCore;
 using blazorWpBooking.Client.Pages;
 using blazorWpBooking.Components;
-using blazorWpBooking.Components.Account;
 using blazorWpBooking.Data;
-using Microsoft.IdentityModel.Tokens;
-using System.Text;
+using Blazored.LocalStorage;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,29 +18,42 @@ builder.Services.AddRazorComponents()
     .AddInteractiveWebAssemblyComponents()
     .AddAuthenticationStateSerialization();
 
+
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddBlazoredLocalStorage();
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<IdentityRedirectManager>();
-builder.Services.AddScoped<AuthenticationStateProvider, IdentityRevalidatingAuthenticationStateProvider>();
+// add circuit-scoped token store and the provider implementation
+builder.Services.AddScoped<CircuitTokenStore>();
+builder.Services.AddScoped<AuthenticationStateProvider, WordPressRevalidatingAuthenticationStateProvider>();
+builder.Services.AddScoped<WordPressRevalidatingAuthenticationStateProvider>();
 
 builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+    options.DefaultSignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+})
+.AddCookie(options =>
+{
+    options.LoginPath = "/Account/Login";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always; // use Always in production with HTTPS
+})
+.AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
     {
-        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-    })
-     .AddJwtBearer(options =>
-    {
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            ValidIssuer = builder.Configuration["Jwt:Issuer"],
-            ValidAudience = builder.Configuration["Jwt:Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]?? string.Empty))
-        };
-    });
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = builder.Configuration["Jwt:Issuer"],
+        ValidAudience = builder.Configuration["Jwt:Audience"],
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"] ?? ""))
+    };
+});
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -64,6 +79,9 @@ builder.Services.AddTransient<WordPressAuthentication>(sp =>
     };
     return wpAuth;
 });
+builder.Services.AddTransient<ServerTokenHandler>();
+builder.Services.AddHttpClient("ApiWithToken")
+    .AddHttpMessageHandler<ServerTokenHandler>();
 
 var app = builder.Build();
 

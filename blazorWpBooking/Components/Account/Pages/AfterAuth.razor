@@ -1,0 +1,45 @@
+@page "/Account/AfterAuth"
+@rendermode InteractiveServer
+
+@using Blazored.LocalStorage
+@inject ILocalStorageService _localStorageService
+
+@inject NavigationManager NavigationManager
+
+<h1>After Authentication</h1>
+<p> Processing Login information... </p>
+
+@code
+{
+    
+    [SupplyParameterFromQuery]
+    public string? Token { get; set; }
+    [SupplyParameterFromQuery]
+    public string? ReturnUrl { get; set; }
+
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+
+            // You can also perform any initialization logic here if needed
+            if (!string.IsNullOrEmpty(Token))
+            {
+                await _localStorageService.SetItemAsync("authToken", Token);
+            }
+
+            if (!string.IsNullOrEmpty(ReturnUrl))
+            {
+                // Navigate to the return URL
+                NavigationManager.NavigateTo(ReturnUrl);
+            }
+            else
+            {
+                // Navigate to a default page if no return URL is provided
+                NavigationManager.NavigateTo("/");
+            }
+        }
+    }
+
+}

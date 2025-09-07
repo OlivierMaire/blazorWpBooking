@@ -1,0 +1,25 @@
+@rendermode InteractiveServer
+
+@using Blazored.LocalStorage
+@inject ILocalStorageService _localStorageService
+@inject NavigationManager NavigationManager
+
+<p> Interactive Logout ... </p>
+
+
+@code {
+
+
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+
+            await _localStorageService.RemoveItemAsync("authToken");
+
+            NavigationManager.NavigateTo("/Account/Login", true);
+        }
+    }
+
+}

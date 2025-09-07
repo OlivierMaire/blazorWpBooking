@@ -1,4 +1,7 @@
-﻿@if (!string.IsNullOrEmpty(DisplayMessage))
+﻿@inject IHttpContextAccessor HttpContextAccessor
+@inject IJSRuntime JS
+
+@if (!string.IsNullOrEmpty(DisplayMessage))
 {
     var statusMessageClass = DisplayMessage.StartsWith("Error") ? "danger" : "success";
     <div class="alert alert-@statusMessageClass" role="alert">
@@ -19,11 +22,39 @@
 
     protected override void OnInitialized()
     {
-        messageFromCookie = HttpContext.Request.Cookies[IdentityRedirectManager.StatusCookieName];
-
-        if (messageFromCookie is not null)
+        var ctx = HttpContextAccessor.HttpContext;
+        if (ctx is not null)
         {
-            HttpContext.Response.Cookies.Delete(IdentityRedirectManager.StatusCookieName);
+            messageFromCookie = ctx.Request.Cookies[IdentityRedirectManager.StatusCookieName];
+
+            if (messageFromCookie is not null)
+            {
+                ctx.Response.Cookies.Delete(IdentityRedirectManager.StatusCookieName);
+            }
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        // If we couldn't read cookie server-side, try client-side (cookie must NOT be HttpOnly)
+        if (messageFromCookie is null)
+        {
+            try
+            {
+                var cookie = await JS.InvokeAsync<string>("blazorWpBooking.readCookie", IdentityRedirectManager.StatusCookieName);
+                if (!string.IsNullOrEmpty(cookie))
+                {
+                    messageFromCookie = cookie;
+                    await JS.InvokeVoidAsync("blazorWpBooking.deleteCookie", IdentityRedirectManager.StatusCookieName);
+                    StateHasChanged();
+                }
+            }
+            catch
+            {
+                // ignore JS interop failures
+            }
         }
     }
 }

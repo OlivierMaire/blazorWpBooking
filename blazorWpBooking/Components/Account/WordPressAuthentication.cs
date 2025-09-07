@@ -13,7 +13,7 @@ public class WordPressAuthentication
 
     }
     
-    public async Task<SignInResult> ValidateUserAsync(
+    public async Task<(SignInResult, TokenResponse?)> ValidateUserAsync(
         string username,
         string password
        )
@@ -42,19 +42,27 @@ public class WordPressAuthentication
             if (response.IsSuccessStatusCode)
             {
                 // User authentication succeeded
-                return SignInResult.Success;
+                return (SignInResult.Success, tokenResponse);
             }
             else
             {
                 // User authentication failed
-                return SignInResult.Failed;
+                return (SignInResult.Failed, null);
             }
         }
     }
-    
+ 
+}
+
+   
     public class TokenResponse
     {
         [JsonPropertyName("token")]
-        public string Token { get; set; }
+        public string Token { get; set; } = string.Empty;
+        [JsonPropertyName("user_display_name")]
+        public string UserDisplayName { get; set; } = string.Empty;
+        [JsonPropertyName("user_email")]
+        public string UserEmail { get; set; } = string.Empty;
+        [JsonPropertyName("user_nicename")]
+        public string UserNiceName { get; set; } = string.Empty;
     }
-}

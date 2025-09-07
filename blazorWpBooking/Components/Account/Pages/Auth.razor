@@ -1,15 +1,14 @@
-﻿@page "/auth"
-
+﻿@page "/authServer"
+@rendermode InteractiveServer
 @using Microsoft.AspNetCore.Authorization
 @using Blazored.LocalStorage
 
 @attribute [Authorize]
-@rendermode InteractiveAuto
 
 @inject AuthenticationStateProvider AuthStateProvider
 @inject ILocalStorageService _localStorageService
 
-<PageTitle>Auth</PageTitle>
+<PageTitle>Auth Server</PageTitle>
 
 <h1>You are authenticated</h1>
 
@@ -18,9 +17,9 @@
     <p>Token: @Token</p>
 </AuthorizeView>
 
-
 @code {
 
+    CircuitTokenStore TokenStore2 { get; set; }
     string Token  { get; set; } = string.Empty;
 
     protected override async Task OnInitializedAsync()

@@ -1,14 +1,29 @@
 ﻿@page "/Account/Login"
 
+@* @rendermode InteractiveServer *@
+
+
 @using System.ComponentModel.DataAnnotations
+@using Blazored.LocalStorage
 @using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Authentication.Cookies
 @using Microsoft.AspNetCore.Identity
+@using System.Security.Claims
 @using blazorWpBooking.Data
+@inject IHttpContextAccessor HttpContextAccessor
 
 
 @inject ILogger<Login> Logger
 @inject NavigationManager NavigationManager
 @inject IdentityRedirectManager RedirectManager
+
+
+@inject ILocalStorageService _localStorageService
+
+
+@inject IAuthenticationService _authenticationService
+@inject AuthenticationStateProvider _authenticationStateProvider
+@inject blazorWpBooking.Components.Account.CircuitTokenStore TokenStore
 
 @inject WordPressAuthentication WordPressAuth
 
@@ -25,12 +40,14 @@
                 <hr />
                 <ValidationSummary class="text-danger" role="alert" />
                 <div class="form-floating mb-3">
-                    <InputText @bind-Value="Input.Email" id="Input.Email" class="form-control" autocomplete="username webauthn" aria-required="true" placeholder="name@example.com" />
+                    <InputText @bind-Value="Input.Email" id="Input.Email" class="form-control"
+                        autocomplete="username webauthn" aria-required="true" placeholder="name@example.com" />
                     <label for="Input.Email" class="form-label">Email</label>
                     <ValidationMessage For="() => Input.Email" class="text-danger" />
                 </div>
                 <div class="form-floating mb-3">
-                    <InputText type="password" @bind-Value="Input.Password" id="Input.Password" class="form-control" autocomplete="current-password" aria-required="true" placeholder="password" />
+                    <InputText type="password" @bind-Value="Input.Password" id="Input.Password" class="form-control"
+                        autocomplete="current-password" aria-required="true" placeholder="password" />
                     <label for="Input.Password" class="form-label">Password</label>
                     <ValidationMessage For="() => Input.Password" class="text-danger" />
                 </div>
@@ -44,17 +61,20 @@
                     <button type="submit" class="w-100 btn btn-lg btn-primary">Log in</button>
                 </div>
                 <hr />
-                <div class="d-flex flex-column">
+                @* <div class="d-flex flex-column">
                     <span class="text-secondary mx-auto mt-2">OR</span>
-                    <PasskeySubmit Operation="PasskeyOperation.Request" Name="Input.Passkey" EmailName="Input.Email" class="btn btn-link mx-auto">Log in with a passkey</PasskeySubmit>
-                </div>
+                    <PasskeySubmit Operation="PasskeyOperation.Request" Name="Input.Passkey" EmailName="Input.Email"
+                        class="btn btn-link mx-auto">Log in with a passkey</PasskeySubmit>
+                </div> *@
                 <hr />
                 <div>
                     <p>
                         <a href="Account/ForgotPassword">Forgot your password?</a>
                     </p>
                     <p>
-                        <a href="@(NavigationManager.GetUriWithQueryParameters("Account/Register", new Dictionary<string, object?> { ["ReturnUrl"] = ReturnUrl }))">Register as a new user</a>
+                        <a
+                            href="@(NavigationManager.GetUriWithQueryParameters("Account/Register", new Dictionary<string, object?> { ["ReturnUrl"] = ReturnUrl }))">Register
+                            as a new user</a>
                     </p>
                     <p>
                         <a href="Account/ResendEmailConfirmation">Resend email confirmation</a>
@@ -91,7 +111,7 @@
 
         editContext = new EditContext(Input);
 
-        if (HttpMethods.IsGet(HttpContext.Request.Method))
+        @* if (HttpMethods.IsGet(HttpContext.Request.Method)) *@
         {
             // Clear the existing external cookie to ensure a clean login process
             @* await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme); *@
@@ -107,40 +127,86 @@
         }
 
         SignInResult result;
-      
-            // If doing a password sign-in, validate the form.
-            if (!editContext.Validate())
-            {
-                return;
-            }
+        TokenResponse? token = null;
 
-            // This doesn't count login failures towards account lockout
-            // To enable password failures to trigger account lockout, set lockoutOnFailure: true
-            result = await WordPressAuth.ValidateUserAsync(Input.Email, Input.Password);
-            @* result = null; //await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: false); *@
-        
+        // If doing a password sign-in, validate the form.
+        if (!editContext.Validate())
+        {
+            return;
+        }
+
+        // This doesn't count login failures towards account lockout
+        // To enable password failures to trigger account lockout, set lockoutOnFailure: true
+        (result, token) = await WordPressAuth.ValidateUserAsync(Input.Email, Input.Password);
+        @* result = null; //await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: false); *@
+
 
         if (result.Succeeded)
         {
+            // store token client-side for client requests
+            @* await _localStorageService.SetItemAsync("token", token); *@
+            @* ((WordPressRevalidatingAuthenticationStateProvider)_authenticationStateProvider).AuthenticateUser(token!); *@
+            // store token server-side for this circuit and update AuthenticationState
+            TokenStore.SetToken(token!);
+            ((WordPressRevalidatingAuthenticationStateProvider)_authenticationStateProvider).AuthenticateUser(token!);
+
+
+            // create cookie-based principal and sign in
+            var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
+            var jwt = handler.ReadJwtToken(token.Token);
+            var identity = new ClaimsIdentity(jwt.Claims, CookieAuthenticationDefaults.AuthenticationScheme);
+            identity.AddClaim(new Claim(ClaimTypes.Name, token.UserDisplayName ?? ""));
+            identity.AddClaim(new Claim(ClaimTypes.Email, token.UserEmail ?? ""));
+            var principal = new ClaimsPrincipal(identity);
+
+            await HttpContextAccessor.HttpContext!.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, new
+            AuthenticationProperties
+            { IsPersistent = Input.RememberMe });
+
+
             Logger.LogInformation("User logged in.");
-            RedirectManager.RedirectTo(ReturnUrl);
+
+            RedirectManager.RedirectTo("Account/AfterAuth", new() { ["returnUrl"] = ReturnUrl, ["token"] = token.Token });
+
+            @* RedirectManager.RedirectTo(ReturnUrl); *@
         }
-        else if (result.RequiresTwoFactor)
+        @* else if (result.RequiresTwoFactor)
         {
             RedirectManager.RedirectTo(
-                "Account/LoginWith2fa",
-                new() { ["returnUrl"] = ReturnUrl, ["rememberMe"] = Input.RememberMe });
+            "Account/LoginWith2fa",
+            new() { ["returnUrl"] = ReturnUrl, ["rememberMe"] = Input.RememberMe });
         }
         else if (result.IsLockedOut)
         {
             Logger.LogWarning("User account locked out.");
             RedirectManager.RedirectTo("Account/Lockout");
-        }
+        } *@
         else
         {
             errorMessage = "Error: Invalid login attempt.";
         }
     }
+
+    @* // Example logout method
+    public async Task LogoutUser()
+    {
+        // remove client token
+        await _localStorageService.RemoveItemAsync("token");
+
+        // clear circuit token and notify
+        TokenStore.Clear();
+        ((WordPressRevalidatingAuthenticationStateProvider)_authenticationStateProvider).MarkUserLoggedOut();
+
+        NavigationManager.NavigateTo("/Account/Login", true);
+
+
+
+         await _localStorageService.RemoveItemAsync("token");
+TokenStore.Clear();
+((WordPressRevalidatingAuthenticationStateProvider)AuthProvider).MarkUserLoggedOut();
+await HttpContextAccessor.HttpContext!.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+NavigationManager.NavigateTo("/Account/Login", true); 
+    } *@
 
     private sealed class InputModel
     {
