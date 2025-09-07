@@ -1,0 +1,101 @@
+# .gitignore for .NET / Blazor projects
+# Generated: 2025-09-07
+
+# Build Folders
+**/bin/
+**/obj/
+**/out/
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Rider
+.idea/
+
+# VS Code
+.vscode/
+
+# Publish output
+publish/
+*.Publish.xml
+
+# NuGet
+*.nupkg
+packages/
+project.lock.json
+project.fragment.lock.json
+project.nuget.cache
+.nuget/
+
+# Dotnet Tooling
+.tools/
+.tool/
+
+# Logs
+*.log
+logs/
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+*.db-journal
+
+# User secrets (usually stored outside repo, but ignore common local files)
+appsettings.Development.json
+secrets.json
+
+# Static web assets and build artifacts produced by Blazor/WebAssembly
+wwwroot/_framework/
+**/bin/**/net*/wwwroot/**/blazor.boot.json
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# JetBrains Rider caches
+.idea/
+*.sln.iml
+
+# Resharper
+_ReSharper*/
+*.DotSettings.user
+
+# Test result files
+TestResults/
+*.trx
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+
+# Node
+node_modules/
+
+# aws, azure, terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# Coverage
+coverage*/
+*.coverage
+*.coveragexml
+
+# Misc
+*.bak
+*.backup
+*~
+
+# Ensure we don't accidentally commit large logs or publish directories
+**/publish/**
+
+# Keep this file tracked
+!important
