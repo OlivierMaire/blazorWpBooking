@@ -6,6 +6,10 @@ using Microsoft.Extensions.Options;
 using blazorWpBooking.Data;
 using Blazored.LocalStorage;
 using System.IdentityModel.Tokens.Jwt;
+using WordPressPCL;
+using WordPressPCL.Models;
+using System.Threading.Tasks;
+using System.Text.Json.Nodes;
 
 namespace blazorWpBooking.Components.Account;
 
@@ -15,6 +19,7 @@ internal sealed class WordPressRevalidatingAuthenticationStateProvider(
         ILoggerFactory loggerFactory,
         IServiceScopeFactory scopeFactory,
         CircuitTokenStore tokenStore,
+        WordPressAuthentication wpAuth,
         IOptions<IdentityOptions> options)
     : RevalidatingServerAuthenticationStateProvider(loggerFactory)
 {
@@ -23,6 +28,7 @@ internal sealed class WordPressRevalidatingAuthenticationStateProvider(
     // private readonly ILocalStorageService _localStorageService;
     private ClaimsPrincipal _anonymous = new ClaimsPrincipal(new ClaimsIdentity());
     private readonly JwtSecurityTokenHandler _jwtSecurityTokenHandler = new JwtSecurityTokenHandler();
+
 
 
     public override async Task<AuthenticationState> GetAuthenticationStateAsync()
@@ -34,7 +40,10 @@ internal sealed class WordPressRevalidatingAuthenticationStateProvider(
             return await Task.FromResult(new AuthenticationState(_anonymous));
         }
 
-        var principal = BuildClaimsPrincipalFromToken(tokenStore);
+        var principal = await BuildClaimsPrincipalFromToken(tokenStore, wpAuth.WordPressApiUrl);
+
+
+
         return await Task.FromResult(new AuthenticationState(principal));
 
 
@@ -58,10 +67,10 @@ internal sealed class WordPressRevalidatingAuthenticationStateProvider(
         tokenStore.Clear();
         NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(_anonymous)));
     }
-    public void AuthenticateUser(TokenResponse token)
+    public async Task AuthenticateUser(TokenResponse token)
     {
         tokenStore.SetToken(token);
-        var principal = BuildClaimsPrincipalFromToken(tokenStore);
+        var principal = await BuildClaimsPrincipalFromToken(tokenStore, wpAuth.WordPressApiUrl);
         NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(principal)));
 
         // var tokenContent = _jwtSecurityTokenHandler.ReadJwtToken(token);
@@ -71,18 +80,43 @@ internal sealed class WordPressRevalidatingAuthenticationStateProvider(
         // NotifyAuthenticationStateChanged(Task.FromResult(state));
     }
 
-    private static ClaimsPrincipal BuildClaimsPrincipalFromToken(CircuitTokenStore token)
+    private static async Task<ClaimsPrincipal> BuildClaimsPrincipalFromToken(CircuitTokenStore token, string wordPressApiUrl = "")
     {
         var handler = new JwtSecurityTokenHandler();
         JwtSecurityToken? jwt = null;
         try
         {
             jwt = handler.ReadJwtToken(token.Token);
+            var claims = jwt.Claims;
+            foreach (var claim in claims)
+            {
+                Console.WriteLine($"Claim Type: {claim.Type}, Claim Value: {claim.Value}");
+                // principal.Claims.Append(claim);
+            }
+
+            //pass the Wordpress REST API base address as string
+            var client = new WordPressClient(wordPressApiUrl + "/wp-json/");
+            client.Auth.UseBearerAuth(JWTPlugin.JWTAuthByEnriqueChavez);
+            client.Auth.SetJWToken(token.Token);
+
+            var jwtData = jwt.Claims.First(c => c.Type == "data").Value;
+            string userIdString = JsonNode.Parse(jwtData)?["user"]?["id"]?.GetValue<string>() ?? string.Empty;
+            int.TryParse(userIdString, out int userId);
+            WordPressPCL.Utility.UsersQueryBuilder queryBuilder = new()
+            {
+                Include = new List<int> { userId },
+                // required for roles to be loaded
+                Context = Context.Edit
+            };
+
+            var user = await client.Users.QueryAsync(queryBuilder, useAuth: true);
         }
         catch
         {
             return new ClaimsPrincipal(new ClaimsIdentity());
         }
+
+
 
         var identity = new ClaimsIdentity(jwt.Claims, "jwt");
         identity.AddClaim(new Claim(ClaimTypes.Name, token.DisplayName ?? ""));
