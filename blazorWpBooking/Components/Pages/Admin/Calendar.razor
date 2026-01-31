@@ -1,0 +1,377 @@
+@page "/admin/calendar"
+@using blazorWpBooking.Data
+@using blazorWpBooking.Components.Pages.Admin.Shared
+@inject blazorWpBooking.Services.ScheduleService ScheduleService
+@using System.Linq
+@inject blazorWpBooking.Services.CalendarService CalendarService
+
+@rendermode InteractiveServer
+
+<h3>Calendar</h3>
+
+<div class="d-flex align-items-center gap-2 mb-3">
+    <button class="btn btn-outline-primary" @onclick="PrevMonth">&lt; Prev</button>
+    <select class="form-select w-auto" @onchange="OnMonthChanged" value="@currentMonth">
+        @for (int m = 1; m <= 12; m++)
+        {
+            <option value="@m">@System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetAbbreviatedMonthName(m)</option>
+        }
+    </select>
+    <select class="form-select w-auto" @onchange="OnYearChanged" value="@currentYear">
+        @foreach (var y in years)
+        {
+            <option value="@y">@y</option>
+        }
+    </select>
+    <button class="btn btn-outline-primary" @onclick="NextMonth">Next &gt;</button>
+</div>
+
+<ScheduleEditor @ref="_scheduleEditor" OnSaved="OnScheduleSaved" />
+
+<div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Calendar Settings</h5>
+        <button class="btn btn-sm btn-outline-secondary" @onclick="() => showSettings = !showSettings">@((showSettings) ? "Hide" : "Show")</button>
+    </div>
+    @if (showSettings)
+    {
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-2 d-flex align-items-center gap-2">
+                        <InputCheckbox @bind-Value="SaturdaysOff" @bind-Value:after="@(async () => await SaveSettings())" />
+                        <label class="mb-0">Saturdays off</label>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="mb-2 d-flex align-items-center gap-2">
+                        <InputCheckbox @bind-Value="SundaysOff" @bind-Value:after="@(async () => await SaveSettings())" />
+                        <label class="mb-0">Sundays off</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-3 d-flex align-items-center gap-2">
+                <label class="mb-0 me-2">Week starts on:</label>
+                <select class="form-select w-auto" @onchange="OnWeekStartChanged" value="@(WeekStartsOnSunday ? "Sunday" : "Monday")">
+                    <option value="Sunday">Sunday</option>
+                    <option value="Monday">Monday</option>
+                </select>
+            </div>
+
+            <hr />
+
+            <div>
+                <label class="form-label">Holidays</label>
+                <div class="d-flex gap-2 align-items-center mb-2">
+                    <input type="date" class="form-control w-auto" @bind="newSpecialDateDate" />
+                    <input type="text" class="form-control" placeholder="Label (optional)" @bind="newSpecialDateLabel" />
+                    <div class="form-check form-check-inline ms-2">
+                        <InputCheckbox class="form-check-input" @bind-Value="newSpecialIsDayOff" />
+                        <label class="form-check-label">Day off</label>
+                    </div>
+                    <button class="btn btn-primary" @onclick="AddSpecialDate">Add</button>
+                </div>
+                <div>
+                    @foreach (var s in SpecialDates)
+                    {
+                        <div class="d-inline-block me-2 mb-1">
+                            <span class="badge @(s.IsDayOff ? "bg-warning text-dark" : "bg-success text-white")">@s.Date.ToString("yyyy-MM-dd") - @(string.IsNullOrWhiteSpace(s.Label) ? (s.IsDayOff ? "Day off" : "Day on") : s.Label)</span>
+                            <a href="#" class="ms-1" @onclick="() => RemoveSpecialDate(s.Date)" @onclick:preventDefault="true">remove</a>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<div class="calendar">
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                @foreach (var dow in dayHeaders)
+                {
+                    <th class="text-center">@dow</th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var week in weeks)
+            {
+                <tr>
+                    @foreach (var cell in week)
+                    {
+                        if (cell.Date == null)
+                        {
+                            <td></td>
+                        }
+                        else
+                        {
+                                var isToday = cell.Date?.Date == DateTime.Today;
+                                var isDayOff = cell.Date.HasValue && IsDayOff(cell.Date.Value);
+                                var tdClass = isToday ? "border border-primary" : string.Empty;
+                                var tdStyle = "vertical-align:top; min-height:90px;" + (isDayOff ? "opacity:0.55;" : string.Empty);
+                            <td class="@tdClass" style="@tdStyle">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <strong>@cell.Date.Value.Day</strong>
+                                    @if (!isDayOff)
+                                    {
+                                        <button class="btn btn-sm btn-outline-success" title="Add schedule" @onclick="() => CreateScheduleForDate(cell.Date.Value)">+</button>
+                                    }
+                                </div>
+                                <div class="mt-1">
+                                    @foreach (var occ in cell.Occurrences)
+                                    {
+                                        var bgColor = occ.LocationColor ?? "#6c757d";
+                                        <div class="badge text-truncate d-block mb-1" title="@occ.Tooltip" style="background-color:@bgColor; color:@GetBadgeTextColor(bgColor)">
+                                            <div role="button" class="text-decoration-none" style="color:@GetBadgeTextColor(bgColor); cursor:pointer;" @onclick="() => OnOccurrenceClick(occ.ScheduleId)">@occ.DisplayText</div>
+                                        </div>
+                                    }
+                                </div>
+                            </td>
+                        }
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    private int currentYear;
+    private int currentMonth;
+    private List<int> years = new();
+    private List<string> dayHeaders = new();
+    private List<List<CalendarCell>> weeks = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var now = DateTime.Today;
+        currentYear = now.Year;
+        currentMonth = now.Month;
+
+        for (int y = now.Year - 5; y <= now.Year + 5; y++) years.Add(y);
+
+        // load persisted settings
+        _settings = await CalendarService.GetSettingsAsync();
+        SundaysOff = _settings?.SundaysOff ?? false;
+        SaturdaysOff = _settings?.SaturdaysOff ?? false;
+        WeekStartsOnSunday = _settings?.WeekStartsOnSunday ?? true;
+
+        // ensure legacy data migrated into SpecialDates and then load special dates
+        await CalendarService.EnsureSpecialDatesMigratedAsync();
+        SpecialDates = await CalendarService.GetSpecialDatesAsync();
+
+        await BuildCalendar();
+    }
+
+    private async Task BuildCalendar()
+    {
+        weeks.Clear();
+        var monthStart = new DateTime(currentYear, currentMonth, 1);
+        var monthEnd = monthStart.AddMonths(1).AddDays(-1);
+
+        var schedules = await ScheduleService.GetSchedulesAsync();
+
+        // Build a mapping date->list of occurrences
+        var occurrences = new Dictionary<DateTime, List<(Schedule Schedule, DateTime Occurrence)>>();
+        foreach (var s in schedules)
+        {
+            foreach (var occ in s.GetOccurrences(monthStart, monthEnd))
+            {
+                var d = occ.Date;
+                if (!occurrences.ContainsKey(d)) occurrences[d] = new List<(Schedule, DateTime)>();
+                occurrences[d].Add((s, occ));
+            }
+        }
+
+        // headers and alignment based on week start
+        var orderedDays = WeekStartsOnSunday
+            ? Enum.GetValues<DayOfWeek>().Cast<DayOfWeek>().ToList()
+            : Enum.GetValues<DayOfWeek>().Cast<DayOfWeek>().Skip(1).Concat(new[] { DayOfWeek.Sunday }).ToList();
+
+        dayHeaders = orderedDays.Select(d => d.ToString().Substring(0, 3)).ToList();
+
+        int startOffset = orderedDays.IndexOf(monthStart.DayOfWeek);
+
+        var cells = new List<CalendarCell?>();
+        for (int i = 0; i < startOffset; i++) cells.Add(null);
+        for (int day = 1; day <= monthEnd.Day; day++)
+        {
+            var d = new DateTime(currentYear, currentMonth, day);
+            var occs = occurrences.ContainsKey(d)
+                ? occurrences[d].Select(x => new OccurrenceInfo { Schedule = x.Schedule, Occurrence = x.Occurrence, LocationColor = x.Schedule.Location?.Color }).ToList()
+                : new List<OccurrenceInfo>();
+            cells.Add(new CalendarCell { Date = d, Occurrences = occs });
+        }
+        while (cells.Count % 7 != 0) cells.Add(null);
+
+        for (int i = 0; i < cells.Count; i += 7)
+        {
+            weeks.Add(cells.Skip(i).Take(7).Select(c => c ?? new CalendarCell { Date = null, Occurrences = new List<OccurrenceInfo>() }).ToList());
+        }
+    }
+
+    private Task PrevMonth()
+    {
+        var dt = new DateTime(currentYear, currentMonth, 1).AddMonths(-1);
+        currentYear = dt.Year; currentMonth = dt.Month;
+        return BuildCalendar();
+    }
+
+    private Task NextMonth()
+    {
+        var dt = new DateTime(currentYear, currentMonth, 1).AddMonths(1);
+        currentYear = dt.Year; currentMonth = dt.Month;
+        return BuildCalendar();
+    }
+
+    private async Task OnMonthChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int m)) currentMonth = m;
+        await BuildCalendar();
+    }
+
+    private async Task OnYearChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int y)) currentYear = y;
+        await BuildCalendar();
+    }
+
+    private class CalendarCell
+    {
+        public DateTime? Date { get; set; }
+        public List<OccurrenceInfo> Occurrences { get; set; } = new();
+    }
+
+    private class OccurrenceInfo
+    {
+        public Schedule Schedule { get; set; } = default!;
+        public DateTime Occurrence { get; set; }
+        public int ScheduleId => Schedule.Id;
+        public string? LocationColor { get; set; }
+        public string DisplayText => Schedule?.Name + " (" + (Occurrence.ToString("HH:mm")) + ")";
+        public string Tooltip => DisplayText;
+    }
+
+    private blazorWpBooking.Components.Pages.Admin.Shared.ScheduleEditor? _scheduleEditor;
+
+    private CalendarSetting? _settings;
+    private List<SpecialDate> SpecialDates { get; set; } = new();
+    private bool SundaysOff { get; set; } = false;
+    private bool SaturdaysOff { get; set; } = false;
+    private bool WeekStartsOnSunday { get; set; } = true;
+    private bool showSettings { get; set; } = true;
+
+    private DateTime? newSpecialDateDate;
+    private string? newSpecialDateLabel;
+    private bool newSpecialIsDayOff = true;
+
+    private async void AddSpecialDate()
+    {
+        var d = newSpecialDateDate;
+        if (d.HasValue)
+        {
+            if (!SpecialDates.Any(h => h.Date.Date == d.Value.Date))
+            {
+                var created = await CalendarService.AddSpecialDateAsync(new SpecialDate { Date = d.Value.Date, Label = newSpecialDateLabel, IsDayOff = newSpecialIsDayOff });
+                SpecialDates.Add(created);
+                newSpecialDateDate = null; newSpecialDateLabel = null; newSpecialIsDayOff = true;
+                await BuildCalendar();
+            }
+        }
+    }
+
+    private async void RemoveSpecialDate(DateTime d)
+    {
+        await CalendarService.RemoveSpecialDateAsync(d);
+        SpecialDates.RemoveAll(h => h.Date.Date == d.Date);
+        await BuildCalendar();
+    }
+
+    // Exceptions are replaced by SpecialDates storage (day-on/day-off entries).
+
+    private bool IsDayOff(DateTime date)
+    {
+        // explicit special date overrides
+        var special = SpecialDates.FirstOrDefault(s => s.Date.Date == date.Date);
+        if (special != null) return special.IsDayOff;
+
+        // fallback to weekend rules
+        if (date.DayOfWeek == DayOfWeek.Saturday && SaturdaysOff) return true;
+        if (date.DayOfWeek == DayOfWeek.Sunday && SundaysOff) return true;
+        return false;
+    }
+
+    private async Task CreateScheduleForDate(DateTime date)
+    {
+        if (_scheduleEditor != null)
+        {
+            await _scheduleEditor.ShowCreateAsync(date);
+        }
+    }
+
+    private async Task OnOccurrenceClick(int scheduleId)
+    {
+        var schedule = await ScheduleService.GetScheduleAsync(scheduleId);
+        if (schedule != null && _scheduleEditor != null)
+        {
+            await _scheduleEditor.ShowEditAsync(schedule);
+        }
+    }
+
+    private async Task OnScheduleSaved(Schedule s)
+    {
+        await BuildCalendar();
+    }
+
+    private async Task SaveSettings(ChangeEventArgs? _ = null)
+    {
+        if (_settings == null)
+        {
+            _settings = new CalendarSetting();
+            _settings.SundaysOff = SundaysOff;
+            _settings.SaturdaysOff = SaturdaysOff;
+            _settings.WeekStartsOnSunday = WeekStartsOnSunday;
+            await CalendarService.UpdateSettingsAsync(_settings);
+        }
+        else
+        {
+            _settings.SundaysOff = SundaysOff;
+            _settings.SaturdaysOff = SaturdaysOff;
+            _settings.WeekStartsOnSunday = WeekStartsOnSunday;
+            await CalendarService.UpdateSettingsAsync(_settings);
+        }
+        await BuildCalendar();
+    }
+
+    private async Task OnWeekStartChanged(ChangeEventArgs e)
+    {
+        var v = e?.Value?.ToString();
+        WeekStartsOnSunday = string.Equals(v, "Sunday", StringComparison.OrdinalIgnoreCase);
+        await SaveSettings();
+    }
+
+    private string GetBadgeTextColor(string? hex)
+    {
+        if (string.IsNullOrWhiteSpace(hex)) return "#ffffff";
+        try
+        {
+            var h = hex.TrimStart('#');
+            if (h.Length == 3)
+            {
+                h = string.Concat(h.Select(c => new string(c, 2)));
+            }
+            var r = Convert.ToInt32(h.Substring(0, 2), 16);
+            var g = Convert.ToInt32(h.Substring(2, 2), 16);
+            var b = Convert.ToInt32(h.Substring(4, 2), 16);
+            var luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+            return luminance > 0.5 ? "#000000" : "#ffffff";
+        }
+        catch
+        {
+            return "#ffffff";
+        }
+    }
+}

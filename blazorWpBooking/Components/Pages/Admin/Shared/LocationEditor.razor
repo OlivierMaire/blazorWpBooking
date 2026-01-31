@@ -1,0 +1,122 @@
+@namespace blazorWpBooking.Components.Pages.Admin
+@using blazorWpBooking.Data
+@inject blazorWpBooking.Services.LocationService LocationService
+@inject IJSRuntime Js
+
+<div class="modal fade @( _visible ? "show" : "" )" tabindex="-1" style="display: @( _visible ? "block" : "none" ); background: rgba(0,0,0,0.5);">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">@(_isEdit ? "Edit Location" : "Add Location")</h5>
+                <button type="button" class="btn-close" aria-label="Close" @onclick="Hide"></button>
+            </div>
+            <EditForm Model="_editModel" OnValidSubmit="HandleSave">
+                <DataAnnotationsValidator />
+                <div class="modal-body">
+                    <div class="mb-2">
+                        <label class="form-label">Name</label>
+                        <InputText class="form-control" @bind-Value="_editModel.Name" />
+                        <ValidationMessage For="() => _editModel.Name" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Address</label>
+                        <InputTextArea class="form-control" @bind-Value="_editModel.Address" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Color</label>
+                        <input type="color" class="form-control form-control-color" style="width:60px; padding:4px;" @bind="_editModel.Color" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary">Save</button>
+                    <button type="button" class="btn btn-secondary" @onclick="Hide">Cancel</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool _visible;
+    private bool _isEdit;
+
+    private LocationEditModel _editModel = new();
+
+    [Parameter]
+    public EventCallback<Location> OnSaved { get; set; }
+
+    public Task ShowCreateAsync()
+    {
+        _isEdit = false;
+        _editModel = new LocationEditModel();
+        _visible = true;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    public async Task ShowEditAsync(Location item)
+    {
+        if (item == null) return;
+        _isEdit = true;
+        _editModel = new LocationEditModel
+        {
+                    Id = item.Id,
+                    Name = item.Name,
+                    Address = item.Address,
+                    Color = item.Color ?? "#0d6efd"
+        };
+        _visible = true;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void Hide()
+    {
+        _visible = false;
+    }
+
+    private async Task HandleSave()
+    {
+        try
+        {
+            if (_isEdit && _editModel.Id > 0)
+            {
+                var existing = await LocationService.GetLocationAsync(_editModel.Id);
+                if (existing != null)
+                {
+                    existing.Name = _editModel.Name;
+                    existing.Address = _editModel.Address;
+                    existing.Color = _editModel.Color;
+                    existing.UpdatedAt = DateTime.UtcNow;
+                    await LocationService.UpdateLocationAsync(existing);
+                    Hide();
+                    await OnSaved.InvokeAsync(existing);
+                    return;
+                }
+            }
+
+            var newLocation = new Location
+            {
+                Name = _editModel.Name,
+                Address = _editModel.Address,
+                Color = _editModel.Color,
+                CreatedAt = DateTime.UtcNow
+            };
+            var created = await LocationService.CreateLocationAsync(newLocation);
+            Hide();
+            await OnSaved.InvokeAsync(created);
+        }
+        catch (Exception ex)
+        {
+            await Js.InvokeVoidAsync("alert", "Error saving location: " + ex.Message);
+        }
+    }
+
+    private class LocationEditModel
+    {
+        public int Id { get; set; }
+        [System.ComponentModel.DataAnnotations.Required]
+        public string Name { get; set; } = string.Empty;
+        public string? Address { get; set; }
+        public string Color { get; set; } = "#0d6efd";
+    }
+}

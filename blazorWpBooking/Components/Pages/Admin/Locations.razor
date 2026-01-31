@@ -1,0 +1,78 @@
+@page "/admin/locations"
+@using blazorWpBooking.Data
+@inject blazorWpBooking.Services.LocationService LocationService
+@inject IJSRuntime Js
+
+@rendermode InteractiveServer
+
+<h3>Locations</h3>
+
+<div>
+    <button class="btn btn-primary" @onclick="() => _locationEditor?.ShowCreateAsync()">Add Location</button>
+</div>
+
+<LocationEditor @ref="_locationEditor" OnSaved="OnLocationSaved" />
+
+<table class="table table-striped mt-3">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Address</th>
+            <th>Created</th>
+            <th>Updated</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var loc in _locations)
+        {
+            <tr>
+                <td>@loc.Name</td>
+                <td>@loc.Address</td>
+                <td>@loc.CreatedAt.ToString("g")</td>
+                <td>@(loc.UpdatedAt?.ToString("g") ?? "--")</td>
+                <td>
+                    <button class="btn btn-sm btn-primary me-1" @onclick="() => Edit(loc.Id)">Edit</button>
+                    <button class="btn btn-sm btn-danger" @onclick="() => Delete(loc.Id)">Delete</button>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private List<Location> _locations = new();
+    private LocationEditor? _locationEditor;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _locations = await LocationService.GetLocationsAsync();
+    }
+
+    private async Task Edit(int id)
+    {
+        var item = await LocationService.GetLocationAsync(id);
+        if (item != null && _locationEditor != null)
+        {
+            await _locationEditor.ShowEditAsync(item);
+        }
+    }
+
+    private async Task Delete(int id)
+    {
+        var ok = await Js.InvokeAsync<bool>("confirm", $"Delete location #{id}? Are you sure?");
+        if (!ok) return;
+        await LocationService.DeleteLocationAsync(id);
+        await LoadData();
+    }
+
+    private async Task OnLocationSaved(Location loc)
+    {
+        await LoadData();
+    }
+}

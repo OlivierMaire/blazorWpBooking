@@ -1,0 +1,79 @@
+@page "/admin/types"
+@using blazorWpBooking.Data
+@inject blazorWpBooking.Services.LessonTypeService LessonTypeService
+@inject IJSRuntime Js
+
+@using blazorWpBooking.Components.Pages.Admin.Shared
+
+@rendermode InteractiveServer
+
+<h3>Lesson Types</h3>
+
+<div>
+    <button class="btn btn-primary" @onclick="() => _typeEditor?.ShowCreateAsync()">Add Type</button>
+</div>
+<TypeEditor @ref="_typeEditor" OnSaved="OnTypeSaved" />
+
+<table class="table table-striped mt-3">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Published</th>
+            <th>Created</th>
+            <th>Updated</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var type in _types)
+        {
+            <tr>
+                <td>@type.Name</td>
+                <td>@(type.IsPublished ? "Yes" : "No")</td>
+                <td>@type.CreatedAt.ToString("g")</td>
+                <td>@(type.UpdatedAt?.ToString("g") ?? "--")</td>
+                <td>
+                    <button class="btn btn-sm btn-primary me-1" @onclick="() => Edit(type.Id)">Edit</button>
+                    <button class="btn btn-sm btn-danger" @onclick="() => Delete(type.Id)">Delete</button>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private List<LessonType> _types = new();
+    private TypeEditor? _typeEditor;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _types = await LessonTypeService.GetTypesAsync();
+    }
+
+    private async Task Edit(int id)
+    {
+        var item = await LessonTypeService.GetTypeAsync(id);
+        if (item != null && _typeEditor != null)
+        {
+            await _typeEditor.ShowEditAsync(item);
+        }
+    }
+
+    private async Task Delete(int id)
+    {
+        var ok = await Js.InvokeAsync<bool>("confirm", $"Delete type #{id}? Are you sure?");
+        if (!ok) return;
+        await LessonTypeService.DeleteTypeAsync(id);
+        await LoadData();
+    }
+
+    private async Task OnTypeSaved(LessonType t)
+    {
+        await LoadData();
+    }
+}

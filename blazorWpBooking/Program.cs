@@ -9,6 +9,7 @@ using blazorWpBooking.Client.Pages;
 using blazorWpBooking.Components;
 using blazorWpBooking.Data;
 using Blazored.LocalStorage;
+using Microsoft.AspNetCore.Builder;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -83,7 +84,24 @@ builder.Services.AddTransient<ServerTokenHandler>();
 builder.Services.AddHttpClient("ApiWithToken")
     .AddHttpMessageHandler<ServerTokenHandler>();
 
+// Application services
+builder.Services.AddScoped<blazorWpBooking.Services.LessonService>();
+builder.Services.AddScoped<blazorWpBooking.Services.LessonTypeService>();
+builder.Services.AddScoped<blazorWpBooking.Services.ScheduleService>();
+builder.Services.AddScoped<blazorWpBooking.Services.LocationService>();
+builder.Services.AddScoped<blazorWpBooking.Services.CalendarService>();
+
 var app = builder.Build();
+
+// Apply pending migrations on startup in Development only
+if (app.Environment.IsDevelopment())
+{
+    using (var scope = app.Services.CreateScope())
+    {
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await dbContext.Database.MigrateAsync();
+    }
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -97,7 +115,7 @@ else
     // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
-app.UseStatusCodePagesWithReExecute("/not-found", createScopeForErrors: true);
+app.UseStatusCodePagesWithReExecute(pathFormat: "/not-found" , createScopeForStatusCodePages: true);
 
 app.UseHttpsRedirection();
 

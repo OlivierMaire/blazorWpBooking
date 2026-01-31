@@ -1,0 +1,307 @@
+@page "/lessons"
+@using Microsoft.EntityFrameworkCore
+@using System.Linq
+@using blazorWpBooking.Data
+@inject blazorWpBooking.Services.LessonService LessonService
+@inject blazorWpBooking.Services.LessonTypeService LessonTypeService
+@inject blazorWpBooking.Services.ScheduleService ScheduleService
+@inject IJSRuntime Js
+
+@rendermode InteractiveServer
+
+<h3>Lessons</h3>
+
+<div>
+    <button class="btn btn-primary" @onclick="BeginAdd">Add Lesson</button>
+</div>
+
+@if (_isAdding || _editItem != null)
+{
+    <EditForm Model="_editModel" OnValidSubmit="Save">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+        <div class="card mt-3 p-3">
+            <div class="mb-2">
+                <label>Name</label>
+                <InputText class="form-control" @bind-Value="_editModel.Name" />
+                <ValidationMessage For="() => _editModel.Name" />
+            </div>
+            <div class="mb-2">
+                <label>Type</label>
+                <div class="input-group">
+                    <InputSelect class="form-select" @bind-Value="_editModel.TypeId">
+                        <option value="">-- none --</option>
+                        @foreach (var t in _types)
+                        {
+                            <option value="@t.Id">@t.Name</option>
+                        }
+                    </InputSelect>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="ShowCreateType">+ New</button>
+                </div>
+            </div>
+            @if (_showCreateType)
+            {
+                <div class="mb-2 p-2 border rounded">
+                    <label>New Type Name</label>
+                    <InputText class="form-control mb-2" @bind-Value="_newTypeName" />
+                    <button type="button" class="btn btn-sm btn-success me-1" @onclick="CreateType">Create</button>
+                    <button type="button" class="btn btn-sm btn-secondary" @onclick="CancelCreateType">Cancel</button>
+                </div>
+            }
+            <div class="mb-2">
+                <label>Schedule</label>
+                <div class="input-group">
+                    <InputSelect class="form-select" @bind-Value="_editModel.ScheduleId">
+                        <option value="">-- none --</option>
+                        @foreach (var s in _schedules)
+                        {
+                            <option value="@s.Id">@s.Name (@s.TimeSlotFrom?.ToString("HH:mm") ?? "--") - (@s.TimeSlotTo?.ToString("HH:mm") ?? "--")</option>
+                        }
+                    </InputSelect>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="ShowCreateSchedule">+ New</button>
+                </div>
+            </div>
+            @if (_showCreateSchedule)
+            {
+                <div class="mb-2 p-2 border rounded">
+                    <label>New Schedule Name</label>
+                    <InputText class="form-control mb-2" @bind-Value="_newScheduleName" />
+                    <label>Time Slot From</label>
+                    <input type="time" class="form-control mb-2" @bind="_newScheduleTimeSlotFrom" />
+                    <label>Time Slot To</label>
+                    <input type="time" class="form-control mb-2" @bind="_newScheduleTimeSlotTo" />
+                    <label>Days of Week</label>
+                    <div class="row mb-2">
+                        @foreach (var day in Enum.GetValues(typeof(DayOfWeek)).Cast<DayOfWeek>())
+                        {
+                            <div class="col-6 col-md-4 mb-1">
+                                <div class="form-check">
+                                    <InputCheckbox class="form-check-input" @bind-Value="_newScheduleSelectedDays[day]" />
+                                    <label class="form-check-label">@day</label>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                    <div class="form-check mb-2">
+                        <InputCheckbox class="form-check-input" @bind-Value="_newScheduleRecurring" />
+                        <label class="form-check-label">Is Recurring</label>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-success me-1" @onclick="CreateSchedule">Create</button>
+                    <button type="button" class="btn btn-sm btn-secondary" @onclick="CancelCreateSchedule">Cancel</button>
+                </div>
+            }
+            <div class="form-check mb-2">
+                <InputCheckbox class="form-check-input" @bind-Value="_editModel.IsPublished" />
+                <label class="form-check-label">Is Published</label>
+            </div>
+            <div>
+                <button type="submit" class="btn btn-success me-2">Save</button>
+                <button type="button" class="btn btn-secondary" @onclick="CancelEdit">Cancel</button>
+            </div>
+        </div>
+    </EditForm>
+}
+
+<table class="table table-striped mt-3">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Schedule</th>
+            <th>Published</th>
+            <th>Created</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var lesson in _lessons)
+        {
+            <tr>
+                <td>@lesson.Name</td>
+                <td>@lesson.Type?.Name</td>
+                <td>@lesson.Schedule?.Description</td>
+                <td>@(lesson.IsPublished ? "Yes" : "No")</td>
+                <td>@lesson.CreatedAt.ToString("g")</td>
+                <td>
+                    <button class="btn btn-sm btn-primary me-1" @onclick="() => Edit(lesson.Id)">Edit</button>
+                    <button class="btn btn-sm btn-danger" @onclick="() => Delete(lesson.Id)">Delete</button>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private List<blazorWpBooking.Data.Lesson> _lessons = new();
+    private List<blazorWpBooking.Data.LessonType> _types = new();
+    private List<blazorWpBooking.Data.Schedule> _schedules = new();
+
+    private bool _isAdding;
+    private LessonEditModel _editModel = new();
+    private blazorWpBooking.Data.Lesson? _editItem;
+    private bool _showCreateType;
+    private string _newTypeName = string.Empty;
+    private bool _showCreateSchedule;
+    private string _newScheduleName = string.Empty;
+    private TimeOnly? _newScheduleTimeSlotFrom;
+    private TimeOnly? _newScheduleTimeSlotTo;
+    private Dictionary<DayOfWeek, bool> _newScheduleSelectedDays = Enum.GetValues(typeof(DayOfWeek)).Cast<DayOfWeek>().ToDictionary(d => d, d => false);
+    private bool _newScheduleRecurring;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _types = await LessonTypeService.GetTypesAsync();
+        _schedules = await ScheduleService.GetSchedulesAsync();
+        _lessons = await LessonService.GetAllLessonsAsync();
+    }
+
+    private void BeginAdd()
+    {
+        _isAdding = true;
+        _editModel = new();
+        _editItem = null;
+    }
+
+    private async Task Edit(int id)
+    {
+        _editItem = await LessonService.GetLessonAsync(id);
+        if (_editItem != null)
+        {
+            _editModel = new LessonEditModel
+            {
+                Id = _editItem.Id,
+                Name = _editItem.Name,
+                TypeId = _editItem.TypeId,
+                ScheduleId = _editItem.ScheduleId,
+                IsPublished = _editItem.IsPublished
+            };
+            _isAdding = false;
+        }
+    }
+
+    private void CancelEdit()
+    {
+        _isAdding = false;
+        _editItem = null;
+        _editModel = new();
+    }
+
+    private async Task Save()
+    {
+        if (_editItem == null)
+        {
+            var newItem = new blazorWpBooking.Data.Lesson
+            {
+                Name = _editModel.Name,
+                TypeId = _editModel.TypeId,
+                ScheduleId = _editModel.ScheduleId,
+                IsPublished = _editModel.IsPublished,
+                CreatedAt = DateTime.UtcNow
+            };
+            await LessonService.CreateAsync(newItem);
+        }
+        else
+        {
+            _editItem.Name = _editModel.Name;
+            _editItem.TypeId = _editModel.TypeId;
+            _editItem.ScheduleId = _editModel.ScheduleId;
+            _editItem.IsPublished = _editModel.IsPublished;
+            _editItem.UpdatedAt = DateTime.UtcNow;
+            await LessonService.UpdateAsync(_editItem);
+        }
+
+        await LoadData();
+        CancelEdit();
+    }
+
+    private async Task Delete(int id)
+    {
+        var ok = await Js.InvokeAsync<bool>("confirm", $"Delete lesson #{id}? Are you sure?");
+        if (!ok) return;
+        await LessonService.DeleteAsync(id);
+        await LoadData();
+    }
+
+    private class LessonEditModel
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public int? TypeId { get; set; }
+        public int? ScheduleId { get; set; }
+        public bool IsPublished { get; set; } = true;
+    }
+
+    private void ShowCreateType()
+    {
+        _showCreateType = true;
+    }
+
+    private void CancelCreateType()
+    {
+        _showCreateType = false;
+        _newTypeName = string.Empty;
+    }
+
+    private async Task CreateType()
+    {
+        if (string.IsNullOrWhiteSpace(_newTypeName))
+            return;
+
+        var newType = new blazorWpBooking.Data.LessonType
+        {
+            Name = _newTypeName.Trim(),
+            IsPublished = false,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        await LessonTypeService.CreateTypeAsync(newType);
+        await LoadData();
+        _editModel.TypeId = newType.Id;
+        CancelCreateType();
+    }
+
+    private void ShowCreateSchedule()
+    {
+        _showCreateSchedule = true;
+        // reset selection to none
+        _newScheduleSelectedDays = Enum.GetValues(typeof(DayOfWeek)).Cast<DayOfWeek>().ToDictionary(d => d, d => false);
+    }
+
+    private void CancelCreateSchedule()
+    {
+        _showCreateSchedule = false;
+        _newScheduleName = string.Empty;
+        _newScheduleTimeSlotFrom = null;
+        _newScheduleTimeSlotTo = null;
+        _newScheduleSelectedDays = Enum.GetValues(typeof(DayOfWeek)).Cast<DayOfWeek>().ToDictionary(d => d, d => false);
+        _newScheduleRecurring = false;
+    }
+
+    private async Task CreateSchedule()
+    {
+        if (string.IsNullOrWhiteSpace(_newScheduleName))
+            return;
+        var newSchedule = new blazorWpBooking.Data.Schedule
+        {
+            Name = _newScheduleName.Trim(),
+            TimeSlotFrom = _newScheduleTimeSlotFrom,
+            TimeSlotTo = _newScheduleTimeSlotTo,
+            IsRecurring = _newScheduleRecurring,
+            IsPublished = false,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        var selectedDays = _newScheduleSelectedDays.Where(kv => kv.Value).Select(kv => kv.Key).ToList();
+        newSchedule.SetDaysOfWeek(selectedDays);
+
+        await ScheduleService.CreateScheduleAsync(newSchedule);
+        await LoadData();
+        _editModel.ScheduleId = newSchedule.Id;
+        CancelCreateSchedule();
+    }
+}

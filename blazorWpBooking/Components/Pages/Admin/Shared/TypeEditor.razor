@@ -1,0 +1,110 @@
+@namespace blazorWpBooking.Components.Pages.Admin.Shared
+@using blazorWpBooking.Data
+@inject blazorWpBooking.Services.LessonTypeService LessonTypeService
+@inject IJSRuntime Js
+
+<div class="modal fade @( _visible ? "show" : "" )" tabindex="-1" style="display: @( _visible ? "block" : "none" ); background: rgba(0,0,0,0.5);">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">@(_isEdit ? "Edit Type" : "Add Type")</h5>
+                <button type="button" class="btn-close" aria-label="Close" @onclick="Hide"></button>
+            </div>
+            <EditForm Model="_editModel" OnValidSubmit="HandleSave">
+                <DataAnnotationsValidator />
+                <div class="modal-body">
+                    <div class="mb-2">
+                        <label class="form-label">Name</label>
+                        <InputText class="form-control" @bind-Value="_editModel.Name" />
+                        <ValidationMessage For="() => _editModel.Name" />
+                    </div>
+                    <div class="form-check mb-2">
+                        <InputCheckbox class="form-check-input" @bind-Value="_editModel.IsPublished" />
+                        <label class="form-check-label">Is Published</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary">Save</button>
+                    <button type="button" class="btn btn-secondary" @onclick="Hide">Cancel</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool _visible;
+    private bool _isEdit;
+
+    private TypeEditModel _editModel = new();
+
+    [Parameter]
+    public EventCallback<LessonType> OnSaved { get; set; }
+
+    public Task ShowCreateAsync()
+    {
+        _isEdit = false;
+        _editModel = new TypeEditModel();
+        _visible = true;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    public async Task ShowEditAsync(LessonType item)
+    {
+        if (item == null) return;
+        _isEdit = true;
+        _editModel = new TypeEditModel
+        {
+            Id = item.Id,
+            Name = item.Name,
+            IsPublished = item.IsPublished
+        };
+        _visible = true;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void Hide() => _visible = false;
+
+    private async Task HandleSave()
+    {
+        try
+        {
+            if (_isEdit && _editModel.Id > 0)
+            {
+                var existing = await LessonTypeService.GetTypeAsync(_editModel.Id);
+                if (existing != null)
+                {
+                    existing.Name = _editModel.Name;
+                    existing.IsPublished = _editModel.IsPublished;
+                    existing.UpdatedAt = DateTime.UtcNow;
+                    await LessonTypeService.UpdateTypeAsync(existing);
+                    Hide();
+                    await OnSaved.InvokeAsync(existing);
+                    return;
+                }
+            }
+
+            var created = await LessonTypeService.CreateTypeAsync(new LessonType
+            {
+                Name = _editModel.Name,
+                IsPublished = _editModel.IsPublished,
+                CreatedAt = DateTime.UtcNow
+            });
+            Hide();
+            await OnSaved.InvokeAsync(created);
+        }
+        catch (Exception ex)
+        {
+            await Js.InvokeVoidAsync("alert", "Error saving type: " + ex.Message);
+        }
+    }
+
+    private class TypeEditModel
+    {
+        public int Id { get; set; }
+        [System.ComponentModel.DataAnnotations.Required]
+        public string Name { get; set; } = string.Empty;
+        public bool IsPublished { get; set; } = true;
+    }
+}

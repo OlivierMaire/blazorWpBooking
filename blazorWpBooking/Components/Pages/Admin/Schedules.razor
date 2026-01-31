@@ -1,0 +1,106 @@
+@page "/admin/schedules"
+@using System.Linq
+@using blazorWpBooking.Data
+@using blazorWpBooking.Components.Pages.Admin.Shared
+@using blazorWpBooking.Components.Pages.Admin
+@inject blazorWpBooking.Services.ScheduleService ScheduleService
+@inject blazorWpBooking.Services.LocationService LocationService
+@inject IJSRuntime Js
+
+@rendermode InteractiveServer
+
+<h3>Schedules</h3>
+
+<div>
+    <button class="btn btn-primary" @onclick="() => _scheduleEditor?.ShowCreateAsync()">Add Schedule</button>
+</div>
+
+<ScheduleEditor @ref="_scheduleEditor" OnSaved="OnScheduleSaved" />
+<LocationEditor @ref="_locationEditor" OnSaved="OnLocationSavedFromSchedule" />
+
+<table class="table table-striped mt-3">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Location</th>
+            <th>Description</th>
+            <th>Time Slot</th>
+            <th>Days</th>
+            <th>Recurring</th>
+            <th>Published</th>
+            <th>Created</th>
+            <th>Updated</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var schedule in _schedules)
+        {
+            <tr>
+                <td>@schedule.Name</td>
+                <td>@schedule.Location?.Name</td>
+                <td>@schedule.Description</td>
+                <td>@(schedule.TimeSlotFrom?.ToString("HH:mm") ?? "--") - @(schedule.TimeSlotTo?.ToString("HH:mm") ?? "--")
+                </td>
+                <td>@schedule.GetDaysOfWeekDisplay()</td>
+                <td>@(schedule.IsRecurring ? "Yes" : "No")</td>
+                <td>@(schedule.IsPublished ? "Yes" : "No")</td>
+                <td>@schedule.CreatedAt.ToString("g")</td>
+                <td>@(schedule.UpdatedAt?.ToString("g") ?? "--")</td>
+                <td>
+                    <button class="btn btn-sm btn-primary me-1" @onclick="() => Edit(schedule.Id)">Edit</button>
+                    <button class="btn btn-sm btn-danger" @onclick="() => Delete(schedule.Id)">Delete</button>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private List<Schedule> _schedules = new();
+    private List<Location> _locations = new();
+    private ScheduleEditor? _scheduleEditor;
+    private LocationEditor? _locationEditor;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        _schedules = await ScheduleService.GetSchedulesAsync();
+        _locations = await LocationService.GetLocationsAsync();
+    }
+
+    private async Task Edit(int id)
+    {
+        var item = await ScheduleService.GetScheduleAsync(id);
+        if (item != null && _scheduleEditor != null)
+        {
+            await _scheduleEditor.ShowEditAsync(item);
+        }
+    }
+
+    private async Task Delete(int id)
+    {
+        var ok = await Js.InvokeAsync<bool>("confirm", $"Delete schedule #{id}? Are you sure?");
+        if (!ok) return;
+        await ScheduleService.DeleteScheduleAsync(id);
+        await LoadData();
+    }
+
+    private async Task OnLocationSavedFromSchedule(Location loc)
+    {
+        // Refresh local list and notify the schedule editor so it can pre-select the new location
+        _locations = await LocationService.GetLocationsAsync();
+        if (_scheduleEditor != null)
+            await _scheduleEditor.OnLocationAdded(loc);
+        StateHasChanged();
+    }
+
+    private async Task OnScheduleSaved(Schedule s)
+    {
+        await LoadData();
+    }
+}

@@ -1,0 +1,240 @@
+@namespace blazorWpBooking.Components.Pages.Admin.Shared
+@using blazorWpBooking.Data
+@inject blazorWpBooking.Services.ScheduleService ScheduleService
+@inject blazorWpBooking.Services.LocationService LocationService
+@inject IJSRuntime Js
+
+<div class="modal fade @( _visible ? "show" : "" )" tabindex="-1" style="display: @( _visible ? "block" : "none" ); background: rgba(0,0,0,0.5);">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">@(_isEdit ? "Edit Schedule" : "Add Schedule")</h5>
+                <button type="button" class="btn-close" aria-label="Close" @onclick="Hide"></button>
+            </div>
+            <EditForm Model="_editModel" OnValidSubmit="HandleSave">
+                <DataAnnotationsValidator />
+                <div class="modal-body">
+                    <div class="mb-2">
+                        <label class="form-label">Name</label>
+                        <InputText class="form-control" @bind-Value="_editModel.Name" />
+                        <ValidationMessage For="() => _editModel.Name" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Description</label>
+                        <InputText class="form-control" @bind-Value="_editModel.Description" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Location</label>
+                        <InputSelect class="form-select" @bind-Value="_editModel.LocationId">
+                            <option value="">-- none --</option>
+                            @foreach (var loc in _locations)
+                            {
+                                <option value="@loc.Id">@loc.Name</option>
+                            }
+                        </InputSelect>
+                    </div>
+                        <div class="row mb-2">
+                            <div class="col-md-6">
+                                <label class="form-label">Start Date</label>
+                                <InputDate class="form-control" @bind-Value="_editModel.StartDate" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">End Date</label>
+                                <InputDate class="form-control" @bind-Value="_editModel.EndDate" />
+                            </div>
+                        </div>
+                    <div class="row mb-2">
+                        <div class="col-md-6">
+                            <label>Time Slot From</label>
+                            <input type="time" class="form-control" @bind="_editModel.TimeSlotFrom" />
+                        </div>
+                        <div class="col-md-6">
+                            <label>Time Slot To</label>
+                            <input type="time" class="form-control" @bind="_editModel.TimeSlotTo" />
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <label>Days of Week</label>
+                        <div class="row">
+                            @foreach (var day in Enum.GetValues<DayOfWeek>())
+                            {
+                                var selected = _editModel.SelectedDays[day];
+                                <div class="col-md-3 mb-2">
+                                    <div class="form-check">
+                                        <InputCheckbox TValue="bool" Value="@(_editModel.SelectedDays[day])"
+                                            ValueChanged="(value) => _editModel.SelectedDays[day] = value"
+                                            ValueExpression="@( () => selected )" />
+                                        <label class="form-check-label">@day</label>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                    <div class="form-check mb-2">
+                        <InputCheckbox class="form-check-input" @bind-Value="_editModel.IsRecurring" />
+                        <label class="form-check-label">Is Recurring</label>
+                    </div>
+                    <div class="form-check mb-2">
+                        <InputCheckbox class="form-check-input" @bind-Value="_editModel.IsPublished" />
+                        <label class="form-check-label">Is Published</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary">Save</button>
+                    <button type="button" class="btn btn-secondary" @onclick="Hide">Cancel</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool _visible;
+    private bool _isEdit;
+    private List<Location> _locations = new();
+
+    private ScheduleEditModel _editModel = new();
+
+    [Parameter]
+    public EventCallback<Schedule> OnSaved { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _locations = await LocationService.GetLocationsAsync();
+    }
+
+    public Task ShowCreateAsync()
+    {
+        _isEdit = false;
+        _editModel = new ScheduleEditModel();
+        _visible = true;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    public Task ShowCreateAsync(DateTime initialDate)
+    {
+        _isEdit = false;
+        _editModel = new ScheduleEditModel
+        {
+            StartDate = initialDate.Date
+        };
+        _visible = true;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    public async Task ShowEditAsync(Schedule item)
+    {
+        if (item == null) return;
+        _isEdit = true;
+        _editModel = new ScheduleEditModel
+        {
+            Id = item.Id,
+            Name = item.Name,
+            Description = item.Description,
+            TimeSlotFrom = item.TimeSlotFrom,
+            TimeSlotTo = item.TimeSlotTo,
+            LocationId = item.LocationId,
+                StartDate = item.StartDate,
+                EndDate = item.EndDate,
+            IsRecurring = item.IsRecurring,
+            IsPublished = item.IsPublished
+        };
+        var selected = item.GetDaysOfWeekList();
+        foreach (var d in selected)
+        {
+            _editModel.SelectedDays[d] = true;
+        }
+        _visible = true;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void Hide() => _visible = false;
+
+    // Called by the host page when a new Location was created elsewhere
+    public async Task OnLocationAdded(Location loc)
+    {
+        _locations = await LocationService.GetLocationsAsync();
+        // If the editor is open, pre-select the created location
+        if (_visible)
+        {
+            _editModel.LocationId = loc.Id;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task HandleSave()
+    {
+        try
+        {
+            var selectedDays = _editModel.SelectedDays.Where(kv => kv.Value).Select(kv => (DayOfWeek)kv.Key).ToList();
+
+            if (!_isEdit)
+            {
+                var newItem = new Schedule
+                {
+                    Name = _editModel.Name,
+                    Description = _editModel.Description,
+                    TimeSlotFrom = _editModel.TimeSlotFrom,
+                    TimeSlotTo = _editModel.TimeSlotTo,
+                    LocationId = _editModel.LocationId,
+                    StartDate = _editModel.StartDate,
+                    EndDate = _editModel.EndDate,
+                    IsRecurring = _editModel.IsRecurring,
+                    IsPublished = _editModel.IsPublished,
+                    CreatedAt = DateTime.UtcNow
+                };
+                newItem.SetDaysOfWeek(selectedDays);
+                var created = await ScheduleService.CreateScheduleAsync(newItem);
+                Hide();
+                await OnSaved.InvokeAsync(created);
+                return;
+            }
+
+            var existing = await ScheduleService.GetScheduleAsync(_editModel.Id);
+            if (existing != null)
+            {
+                existing.Name = _editModel.Name;
+                existing.Description = _editModel.Description;
+                existing.TimeSlotFrom = _editModel.TimeSlotFrom;
+                existing.TimeSlotTo = _editModel.TimeSlotTo;
+                existing.LocationId = _editModel.LocationId;
+                existing.SetDaysOfWeek(selectedDays);
+                existing.IsRecurring = _editModel.IsRecurring;
+                existing.IsPublished = _editModel.IsPublished;
+                existing.StartDate = _editModel.StartDate;
+                existing.EndDate = _editModel.EndDate;
+                existing.UpdatedAt = DateTime.UtcNow;
+                await ScheduleService.UpdateScheduleAsync(existing);
+                Hide();
+                await OnSaved.InvokeAsync(existing);
+            }
+        }
+        catch (Exception ex)
+        {
+            await Js.InvokeVoidAsync("alert", "Error saving schedule: " + ex.Message);
+        }
+    }
+
+    private class ScheduleEditModel
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public TimeOnly? TimeSlotFrom { get; set; }
+        public TimeOnly? TimeSlotTo { get; set; }
+        public int? LocationId { get; set; }
+        public Dictionary<DayOfWeek, bool> SelectedDays { get; set; } = new();
+        public bool IsRecurring { get; set; }
+        public bool IsPublished { get; set; } = true;
+        public DateTime? StartDate { get; set; }
+        public DateTime? EndDate { get; set; }
+
+        public ScheduleEditModel()
+        {
+            foreach (var day in Enum.GetValues<DayOfWeek>())
+                SelectedDays[day] = false;
+        }
+    }
+}

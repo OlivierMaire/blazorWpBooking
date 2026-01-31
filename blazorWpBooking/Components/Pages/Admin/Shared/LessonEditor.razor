@@ -1,0 +1,179 @@
+@namespace blazorWpBooking.Components.Pages.Admin.Shared
+@using blazorWpBooking.Data
+@inject blazorWpBooking.Services.LessonService LessonService
+@inject blazorWpBooking.Services.LessonTypeService LessonTypeService
+@inject blazorWpBooking.Services.ScheduleService ScheduleService
+@inject IJSRuntime Js
+
+<div class="modal fade @( _visible ? "show" : "" )" tabindex="-1" style="display: @( _visible ? "block" : "none" ); background: rgba(0,0,0,0.5);">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">@(_isEdit ? "Edit Lesson" : "Add Lesson")</h5>
+                <button type="button" class="btn-close" aria-label="Close" @onclick="Hide"></button>
+            </div>
+            <EditForm Model="_editModel" OnValidSubmit="HandleSave">
+                <DataAnnotationsValidator />
+                <div class="modal-body">
+                    <div class="mb-2">
+                        <label class="form-label">Name</label>
+                        <InputText class="form-control" @bind-Value="_editModel.Name" />
+                        <ValidationMessage For="() => _editModel.Name" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Type</label>
+                        <div class="input-group">
+                            <InputSelect class="form-select" @bind-Value="_editModel.TypeId">
+                                <option value="">-- none --</option>
+                                @foreach (var t in _types)
+                                {
+                                    <option value="@t.Id">@t.Name</option>
+                                }
+                            </InputSelect>
+                            <button type="button" class="btn btn-outline-secondary" @onclick="() => _typeEditor?.ShowCreateAsync()">+ New</button>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Schedule</label>
+                        <div class="input-group">
+                            <InputSelect class="form-select" @bind-Value="_editModel.ScheduleId">
+                                <option value="">-- none --</option>
+                                @foreach (var s in _schedules)
+                                {
+                                    <option value="@s.Id">@s.Name (@s.TimeSlotFrom?.ToString("HH:mm") ?? "--") - (@s.TimeSlotTo?.ToString("HH:mm") ?? "--")</option>
+                                }
+                            </InputSelect>
+                            <button type="button" class="btn btn-outline-secondary" @onclick="() => _scheduleEditor?.ShowCreateAsync()">+ New</button>
+                        </div>
+                    </div>
+                    <div class="form-check mb-2">
+                        <InputCheckbox class="form-check-input" @bind-Value="_editModel.IsPublished" />
+                        <label class="form-check-label">Is Published</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary">Save</button>
+                    <button type="button" class="btn btn-secondary" @onclick="Hide">Cancel</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+<TypeEditor @ref="_typeEditor" OnSaved="OnTypeSaved" />
+<ScheduleEditor @ref="_scheduleEditor" OnSaved="OnScheduleSaved" />
+
+@code {
+    private bool _visible;
+    private bool _isEdit;
+    private List<LessonType> _types = new();
+    private List<Schedule> _schedules = new();
+
+    private LessonEditModel _editModel = new();
+    private TypeEditor? _typeEditor;
+    private ScheduleEditor? _scheduleEditor;
+
+    [Parameter]
+    public EventCallback<blazorWpBooking.Data.Lesson> OnSaved { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadLists();
+    }
+
+    private async Task LoadLists()
+    {
+        _types = await LessonTypeService.GetTypesAsync();
+        _schedules = await ScheduleService.GetSchedulesAsync();
+    }
+
+    public Task ShowCreateAsync()
+    {
+        _isEdit = false;
+        _editModel = new LessonEditModel();
+        _visible = true;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    public async Task ShowEditAsync(blazorWpBooking.Data.Lesson item)
+    {
+        if (item == null) return;
+        _isEdit = true;
+        _editModel = new LessonEditModel
+        {
+            Id = item.Id,
+            Name = item.Name,
+            TypeId = item.TypeId,
+            ScheduleId = item.ScheduleId,
+            IsPublished = item.IsPublished
+        };
+        _visible = true;
+        await LoadLists();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void Hide() => _visible = false;
+
+    private async Task HandleSave()
+    {
+        try
+        {
+            if (!_isEdit)
+            {
+                var newItem = new blazorWpBooking.Data.Lesson
+                {
+                    Name = _editModel.Name,
+                    TypeId = _editModel.TypeId,
+                    ScheduleId = _editModel.ScheduleId,
+                    IsPublished = _editModel.IsPublished,
+                    CreatedAt = DateTime.UtcNow
+                };
+                var created = await LessonService.CreateAsync(newItem);
+                Hide();
+                await OnSaved.InvokeAsync(created);
+                return;
+            }
+
+            var existing = await LessonService.GetLessonAsync(_editModel.Id);
+            if (existing != null)
+            {
+                existing.Name = _editModel.Name;
+                existing.TypeId = _editModel.TypeId;
+                existing.ScheduleId = _editModel.ScheduleId;
+                existing.IsPublished = _editModel.IsPublished;
+                existing.UpdatedAt = DateTime.UtcNow;
+                await LessonService.UpdateAsync(existing);
+                Hide();
+                await OnSaved.InvokeAsync(existing);
+            }
+        }
+        catch (Exception ex)
+        {
+            await Js.InvokeVoidAsync("alert", "Error saving lesson: " + ex.Message);
+        }
+    }
+
+    private async Task OnTypeSaved(LessonType t)
+    {
+        await LoadLists();
+        _editModel.TypeId = t.Id;
+        StateHasChanged();
+    }
+
+    private async Task OnScheduleSaved(Schedule s)
+    {
+        await LoadLists();
+        _editModel.ScheduleId = s.Id;
+        StateHasChanged();
+    }
+
+    private class LessonEditModel
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public int? TypeId { get; set; }
+        public int? ScheduleId { get; set; }
+        public bool IsPublished { get; set; } = true;
+    }
+}
