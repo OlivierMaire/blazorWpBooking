@@ -15,6 +15,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 	public DbSet<SpecialDate> SpecialDates { get; set; } = null!;
 	public DbSet<Level> Levels { get; set; } = null!;
 	public DbSet<Group> Groups { get; set; } = null!;
+	public DbSet<LocalizationString> LocalizationStrings { get; set; } = null!;
 
 	protected override void OnModelCreating(ModelBuilder modelBuilder)
 	{

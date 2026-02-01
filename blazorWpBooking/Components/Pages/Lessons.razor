@@ -6,13 +6,14 @@
 @inject blazorWpBooking.Services.LessonTypeService LessonTypeService
 @inject blazorWpBooking.Services.ScheduleService ScheduleService
 @inject IJSRuntime Js
+@inject IStringLocalizer<blazorWpBooking.Resources.SharedResource> Localizer
 
 @rendermode InteractiveServer
 
-<h3>Lessons</h3>
+<h3>@Localizer["Lessons"]</h3>
 
 <div>
-    <button class="btn btn-primary" @onclick="BeginAdd">Add Lesson</button>
+    <button class="btn btn-primary" @onclick="BeginAdd">@Localizer["AddLesson"]</button>
 </div>
 
 @if (_isAdding || _editItem != null)
@@ -22,55 +23,55 @@
         <ValidationSummary />
         <div class="card mt-3 p-3">
             <div class="mb-2">
-                <label>Name</label>
+                <label>@Localizer["Name"]</label>
                 <InputText class="form-control" @bind-Value="_editModel.Name" />
                 <ValidationMessage For="() => _editModel.Name" />
             </div>
             <div class="mb-2">
-                <label>Type</label>
+                <label>@Localizer["Type"]</label>
                 <div class="input-group">
                     <InputSelect class="form-select" @bind-Value="_editModel.TypeId">
-                        <option value="">-- none --</option>
+                        <option value="">-- @Localizer["None"] --</option>
                         @foreach (var t in _types)
                         {
                             <option value="@t.Id">@t.Name</option>
                         }
                     </InputSelect>
-                    <button type="button" class="btn btn-outline-secondary" @onclick="ShowCreateType">+ New</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="ShowCreateType">+ @Localizer["New"]</button>
                 </div>
             </div>
             @if (_showCreateType)
             {
                 <div class="mb-2 p-2 border rounded">
-                    <label>New Type Name</label>
+                    <label>@Localizer["NewTypeName"]</label>
                     <InputText class="form-control mb-2" @bind-Value="_newTypeName" />
-                    <button type="button" class="btn btn-sm btn-success me-1" @onclick="CreateType">Create</button>
-                    <button type="button" class="btn btn-sm btn-secondary" @onclick="CancelCreateType">Cancel</button>
+                    <button type="button" class="btn btn-sm btn-success me-1" @onclick="CreateType">@Localizer["Create"]</button>
+                    <button type="button" class="btn btn-sm btn-secondary" @onclick="CancelCreateType">@Localizer["Cancel"]</button>
                 </div>
             }
             <div class="mb-2">
-                <label>Schedule</label>
+                <label>@Localizer["Schedule"]</label>
                 <div class="input-group">
                     <InputSelect class="form-select" @bind-Value="_editModel.ScheduleId">
-                        <option value="">-- none --</option>
+                        <option value="">-- @Localizer["None"] --</option>
                         @foreach (var s in _schedules)
                         {
                             <option value="@s.Id">@s.Name (@s.TimeSlotFrom?.ToString("HH:mm") ?? "--") - (@s.TimeSlotTo?.ToString("HH:mm") ?? "--")</option>
                         }
                     </InputSelect>
-                    <button type="button" class="btn btn-outline-secondary" @onclick="ShowCreateSchedule">+ New</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="ShowCreateSchedule">+ @Localizer["New"]</button>
                 </div>
             </div>
             @if (_showCreateSchedule)
             {
                 <div class="mb-2 p-2 border rounded">
-                    <label>New Schedule Name</label>
+                    <label>@Localizer["NewScheduleName"]</label>
                     <InputText class="form-control mb-2" @bind-Value="_newScheduleName" />
-                    <label>Time Slot From</label>
+                    <label>@Localizer["TimeSlotFrom"]</label>
                     <input type="time" class="form-control mb-2" @bind="_newScheduleTimeSlotFrom" />
-                    <label>Time Slot To</label>
+                    <label>@Localizer["TimeSlotTo"]</label>
                     <input type="time" class="form-control mb-2" @bind="_newScheduleTimeSlotTo" />
-                    <label>Days of Week</label>
+                    <label>@Localizer["DaysOfWeek"]</label>
                     <div class="row mb-2">
                         @foreach (var day in Enum.GetValues(typeof(DayOfWeek)).Cast<DayOfWeek>())
                         {
@@ -84,19 +85,19 @@
                     </div>
                     <div class="form-check mb-2">
                         <InputCheckbox class="form-check-input" @bind-Value="_newScheduleRecurring" />
-                        <label class="form-check-label">Is Recurring</label>
+                        <label class="form-check-label">@Localizer["IsRecurring"]</label>
                     </div>
-                    <button type="button" class="btn btn-sm btn-success me-1" @onclick="CreateSchedule">Create</button>
-                    <button type="button" class="btn btn-sm btn-secondary" @onclick="CancelCreateSchedule">Cancel</button>
+                    <button type="button" class="btn btn-sm btn-success me-1" @onclick="CreateSchedule">@Localizer["Create"]</button>
+                    <button type="button" class="btn btn-sm btn-secondary" @onclick="CancelCreateSchedule">@Localizer["Cancel"]</button>
                 </div>
             }
             <div class="form-check mb-2">
                 <InputCheckbox class="form-check-input" @bind-Value="_editModel.IsPublished" />
-                <label class="form-check-label">Is Published</label>
+                <label class="form-check-label">@Localizer["IsPublished"]</label>
             </div>
             <div>
-                <button type="submit" class="btn btn-success me-2">Save</button>
-                <button type="button" class="btn btn-secondary" @onclick="CancelEdit">Cancel</button>
+                <button type="submit" class="btn btn-success me-2">@Localizer["Save"]</button>
+                <button type="button" class="btn btn-secondary" @onclick="CancelEdit">@Localizer["Cancel"]</button>
             </div>
         </div>
     </EditForm>
@@ -105,11 +106,11 @@
 <table class="table table-striped mt-3">
     <thead>
         <tr>
-            <th>Name</th>
-            <th>Type</th>
-            <th>Schedule</th>
-            <th>Published</th>
-            <th>Created</th>
+            <th>@Localizer["Name"]</th>
+            <th>@Localizer["Type"]</th>
+            <th>@Localizer["Schedule"]</th>
+            <th>@Localizer["Published"]</th>
+            <th>@Localizer["Created"]</th>
             <th></th>
         </tr>
     </thead>

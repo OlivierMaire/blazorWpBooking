@@ -10,6 +10,9 @@ using blazorWpBooking.Components;
 using blazorWpBooking.Data;
 using Blazored.LocalStorage;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Localization;
+using System.Globalization;
+using Microsoft.Extensions.Localization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -90,6 +93,21 @@ builder.Services.AddScoped<blazorWpBooking.Services.LessonTypeService>();
 builder.Services.AddScoped<blazorWpBooking.Services.ScheduleService>();
 builder.Services.AddScoped<blazorWpBooking.Services.LocationService>();
 builder.Services.AddScoped<blazorWpBooking.Services.CalendarService>();
+builder.Services.AddScoped<blazorWpBooking.Services.LocalizationService>();
+
+// Localization - Database-based
+builder.Services.AddScoped<IStringLocalizerFactory, blazorWpBooking.Localization.DatabaseStringLocalizerFactory>();
+builder.Services.AddScoped(typeof(IStringLocalizer<>), typeof(blazorWpBooking.Localization.DatabaseStringLocalizer<>));
+builder.Services.Configure<RequestLocalizationOptions>(options =>
+{
+    var supportedCultures = new[] { "en-US", "fr-FR", "ja-JP" };
+    options.SetDefaultCulture("en-US")
+           .AddSupportedCultures(supportedCultures)
+           .AddSupportedUICultures(supportedCultures);
+
+    // options.RequestCultureProviders.Insert(0, new QueryStringRequestCultureProvider());
+    options.RequestCultureProviders.Insert(1, new CookieRequestCultureProvider());
+});
 
 var app = builder.Build();
 
@@ -100,6 +118,10 @@ if (app.Environment.IsDevelopment())
     {
         var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         await dbContext.Database.MigrateAsync();
+        
+        // Seed localization strings
+        var localizationService = scope.ServiceProvider.GetRequiredService<blazorWpBooking.Services.LocalizationService>();
+        await localizationService.SeedFromResxAsync();
     }
 }
 
@@ -118,6 +140,8 @@ else
 app.UseStatusCodePagesWithReExecute(pathFormat: "/not-found" , createScopeForStatusCodePages: true);
 
 app.UseHttpsRedirection();
+
+app.UseRequestLocalization();
 
 app.UseAntiforgery();
 

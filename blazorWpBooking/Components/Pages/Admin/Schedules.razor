@@ -6,13 +6,14 @@
 @inject blazorWpBooking.Services.ScheduleService ScheduleService
 @inject blazorWpBooking.Services.LocationService LocationService
 @inject IJSRuntime Js
+@inject IStringLocalizer<blazorWpBooking.Resources.SharedResource> Localizer
 
 @rendermode InteractiveServer
 
-<h3>Schedules</h3>
+<h3>@Localizer["Schedules"]</h3>
 
 <div>
-    <button class="btn btn-primary" @onclick="() => _scheduleEditor?.ShowCreateAsync()">Add Schedule</button>
+    <button class="btn btn-primary" @onclick="() => _scheduleEditor?.ShowCreateAsync()">@Localizer["AddSchedule"]</button>
 </div>
 
 <ScheduleEditor @ref="_scheduleEditor" OnSaved="OnScheduleSaved" />

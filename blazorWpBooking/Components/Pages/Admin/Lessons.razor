@@ -5,15 +5,16 @@
 @inject blazorWpBooking.Services.LessonTypeService LessonTypeService
 @inject blazorWpBooking.Services.ScheduleService ScheduleService
 @inject IJSRuntime Js
+@inject IStringLocalizer<blazorWpBooking.Resources.SharedResource> Localizer
 
 @rendermode InteractiveServer
 
 @using blazorWpBooking.Components.Pages.Admin.Shared
 
-<h3>Lessons</h3>
+<h3>@Localizer["Lessons"]</h3>
 
 <div>
-    <button class="btn btn-primary" @onclick="() => _lessonEditor?.ShowCreateAsync()">Add Lesson</button>
+    <button class="btn btn-primary" @onclick="() => _lessonEditor?.ShowCreateAsync()">@Localizer["AddLesson"]</button>
 </div>
 
 <LessonEditor @ref="_lessonEditor" OnSaved="OnLessonSaved" />

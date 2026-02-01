@@ -2,13 +2,14 @@
 @using blazorWpBooking.Data
 @inject blazorWpBooking.Services.LocationService LocationService
 @inject IJSRuntime Js
+@inject IStringLocalizer<blazorWpBooking.Resources.SharedResource> Localizer
 
 @rendermode InteractiveServer
 
-<h3>Locations</h3>
+<h3>@Localizer["Locations"]</h3>
 
 <div>
-    <button class="btn btn-primary" @onclick="() => _locationEditor?.ShowCreateAsync()">Add Location</button>
+    <button class="btn btn-primary" @onclick="() => _locationEditor?.ShowCreateAsync()">@Localizer["AddLocation"]</button>
 </div>
 
 <LocationEditor @ref="_locationEditor" OnSaved="OnLocationSaved" />
@@ -16,10 +17,10 @@
 <table class="table table-striped mt-3">
     <thead>
         <tr>
-            <th>Name</th>
-            <th>Address</th>
-            <th>Created</th>
-            <th>Updated</th>
+            <th>@Localizer["Name"]</th>
+            <th>@Localizer["Address"]</th>
+            <th>@Localizer["Created"]</th>
+            <th>@Localizer["Updated"]</th>
             <th></th>
         </tr>
     </thead>

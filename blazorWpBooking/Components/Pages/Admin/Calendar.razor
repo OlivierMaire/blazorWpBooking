@@ -4,10 +4,19 @@
 @inject blazorWpBooking.Services.ScheduleService ScheduleService
 @using System.Linq
 @inject blazorWpBooking.Services.CalendarService CalendarService
+@inject IStringLocalizer<blazorWpBooking.Resources.SharedResource> Localizer
+@inject NavigationManager Navigation
+@using Microsoft.Extensions.Localization
 
 @rendermode InteractiveServer
 
-<h3>Calendar</h3>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3>@Localizer["Calendar"]</h3>
+    <select class="form-select w-auto" @onchange="OnCultureChanged">
+        <option value="en-US">English</option>
+        <option value="fr-FR">Français</option>
+    </select>
+</div>
 
 <div class="d-flex align-items-center gap-2 mb-3">
     <button class="btn btn-outline-primary" @onclick="PrevMonth">&lt; Prev</button>
@@ -30,7 +39,7 @@
 
 <div class="card mb-3">
     <div class="card-header d-flex justify-content-between align-items-center">
-        <h5 class="mb-0">Calendar Settings</h5>
+        <h5 class="mb-0">@Localizer["CalendarSettings"]</h5>
         <button class="btn btn-sm btn-outline-secondary" @onclick="() => showSettings = !showSettings">@((showSettings) ? "Hide" : "Show")</button>
     </div>
     @if (showSettings)
@@ -40,19 +49,19 @@
                 <div class="col-md-6">
                     <div class="mb-2 d-flex align-items-center gap-2">
                         <InputCheckbox @bind-Value="SaturdaysOff" @bind-Value:after="@(async () => await SaveSettings())" />
-                        <label class="mb-0">Saturdays off</label>
+                        <label class="mb-0">@Localizer["SaturdaysOff"]</label>
                     </div>
                 </div>
                 <div class="col-md-6">
                     <div class="mb-2 d-flex align-items-center gap-2">
                         <InputCheckbox @bind-Value="SundaysOff" @bind-Value:after="@(async () => await SaveSettings())" />
-                        <label class="mb-0">Sundays off</label>
+                        <label class="mb-0">@Localizer["SundaysOff"]</label>
                     </div>
                 </div>
             </div>
 
             <div class="mb-3 d-flex align-items-center gap-2">
-                <label class="mb-0 me-2">Week starts on:</label>
+                <label class="mb-0 me-2">@Localizer["WeekStartsOn"]</label>
                 <select class="form-select w-auto" @onchange="OnWeekStartChanged" value="@(WeekStartsOnSunday ? "Sunday" : "Monday")">
                     <option value="Sunday">Sunday</option>
                     <option value="Monday">Monday</option>
@@ -62,15 +71,15 @@
             <hr />
 
             <div>
-                <label class="form-label">Holidays</label>
+                <label class="form-label">@Localizer["Holidays"]</label>
                 <div class="d-flex gap-2 align-items-center mb-2">
                     <input type="date" class="form-control w-auto" @bind="newSpecialDateDate" />
                     <input type="text" class="form-control" placeholder="Label (optional)" @bind="newSpecialDateLabel" />
                     <div class="form-check form-check-inline ms-2">
                         <InputCheckbox class="form-check-input" @bind-Value="newSpecialIsDayOff" />
-                        <label class="form-check-label">Day off</label>
+                        <label class="form-check-label">@Localizer["DayOff"]</label>
                     </div>
-                    <button class="btn btn-primary" @onclick="AddSpecialDate">Add</button>
+                    <button class="btn btn-primary" @onclick="AddSpecialDate">@Localizer["Add"]</button>
                 </div>
                 <div>
                     @foreach (var s in SpecialDates)
@@ -346,10 +355,18 @@
         await BuildCalendar();
     }
 
+    private async Task OnCultureChanged(ChangeEventArgs e)
+    {
+        var culture = e.Value?.ToString();
+        if (!string.IsNullOrEmpty(culture))
+        {
+            Navigation.NavigateTo(Navigation.Uri + "?culture=" + culture, forceLoad: true);
+        }
+    }
+
     private async Task OnWeekStartChanged(ChangeEventArgs e)
     {
-        var v = e?.Value?.ToString();
-        WeekStartsOnSunday = string.Equals(v, "Sunday", StringComparison.OrdinalIgnoreCase);
+        WeekStartsOnSunday = e.Value?.ToString() == "Sunday";
         await SaveSettings();
     }
 

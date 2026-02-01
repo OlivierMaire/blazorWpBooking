@@ -2,25 +2,26 @@
 @using blazorWpBooking.Data
 @inject blazorWpBooking.Services.LessonTypeService LessonTypeService
 @inject IJSRuntime Js
+@inject IStringLocalizer<blazorWpBooking.Resources.SharedResource> Localizer
 
 @using blazorWpBooking.Components.Pages.Admin.Shared
 
 @rendermode InteractiveServer
 
-<h3>Lesson Types</h3>
+<h3>@Localizer["LessonTypes"]</h3>
 
 <div>
-    <button class="btn btn-primary" @onclick="() => _typeEditor?.ShowCreateAsync()">Add Type</button>
+    <button class="btn btn-primary" @onclick="() => _typeEditor?.ShowCreateAsync()">@Localizer["AddType"]</button>
 </div>
 <TypeEditor @ref="_typeEditor" OnSaved="OnTypeSaved" />
 
 <table class="table table-striped mt-3">
     <thead>
         <tr>
-            <th>Name</th>
-            <th>Published</th>
-            <th>Created</th>
-            <th>Updated</th>
+            <th>@Localizer["Name"]</th>
+            <th>@Localizer["Published"]</th>
+            <th>@Localizer["Created"]</th>
+            <th>@Localizer["Updated"]</th>
             <th></th>
         </tr>
     </thead>
@@ -29,7 +30,7 @@
         {
             <tr>
                 <td>@type.Name</td>
-                <td>@(type.IsPublished ? "Yes" : "No")</td>
+                <td>@(type.IsPublished ? @Localizer["Yes"] : @Localizer["No"])</td>
                 <td>@type.CreatedAt.ToString("g")</td>
                 <td>@(type.UpdatedAt?.ToString("g") ?? "--")</td>
                 <td>
