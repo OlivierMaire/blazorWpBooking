@@ -3,6 +3,7 @@
 @using blazorWpBooking.Components.Pages.Admin.Shared
 @inject blazorWpBooking.Services.ScheduleService ScheduleService
 @using System.Linq
+@using System.Globalization
 @inject blazorWpBooking.Services.CalendarService CalendarService
 @inject IStringLocalizer<blazorWpBooking.Resources.SharedResource> Localizer
 @inject NavigationManager Navigation
@@ -12,18 +13,14 @@
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h3>@Localizer["Calendar"]</h3>
-    <select class="form-select w-auto" @onchange="OnCultureChanged">
-        <option value="en-US">English</option>
-        <option value="fr-FR">Français</option>
-    </select>
 </div>
 
 <div class="d-flex align-items-center gap-2 mb-3">
-    <button class="btn btn-outline-primary" @onclick="PrevMonth">&lt; Prev</button>
+    <button class="btn btn-outline-primary" @onclick="PrevMonth">&lt; @Localizer["Previous"]</button>
     <select class="form-select w-auto" @onchange="OnMonthChanged" value="@currentMonth">
         @for (int m = 1; m <= 12; m++)
         {
-            <option value="@m">@System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetAbbreviatedMonthName(m)</option>
+            <option value="@m">@CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(m)</option>
         }
     </select>
     <select class="form-select w-auto" @onchange="OnYearChanged" value="@currentYear">
@@ -32,7 +29,7 @@
             <option value="@y">@y</option>
         }
     </select>
-    <button class="btn btn-outline-primary" @onclick="NextMonth">Next &gt;</button>
+    <button class="btn btn-outline-primary" @onclick="NextMonth">@Localizer["Next"] &gt;</button>
 </div>
 
 <ScheduleEditor @ref="_scheduleEditor" OnSaved="OnScheduleSaved" />
@@ -196,11 +193,13 @@
         }
 
         // headers and alignment based on week start
-        var orderedDays = WeekStartsOnSunday
+        List<DayOfWeek>? orderedDays = WeekStartsOnSunday
             ? Enum.GetValues<DayOfWeek>().Cast<DayOfWeek>().ToList()
             : Enum.GetValues<DayOfWeek>().Cast<DayOfWeek>().Skip(1).Concat(new[] { DayOfWeek.Sunday }).ToList();
 
-        dayHeaders = orderedDays.Select(d => d.ToString().Substring(0, 3)).ToList();
+        @* dayHeaders = orderedDays.Select(d => d.ToString().Substring(0, 3)).ToList(); *@
+        dayHeaders = orderedDays.Select(d => CultureInfo.CurrentCulture.DateTimeFormat.GetAbbreviatedDayName(d)).ToList();
+
 
         int startOffset = orderedDays.IndexOf(monthStart.DayOfWeek);
 
@@ -355,14 +354,7 @@
         await BuildCalendar();
     }
 
-    private async Task OnCultureChanged(ChangeEventArgs e)
-    {
-        var culture = e.Value?.ToString();
-        if (!string.IsNullOrEmpty(culture))
-        {
-            Navigation.NavigateTo(Navigation.Uri + "?culture=" + culture, forceLoad: true);
-        }
-    }
+
 
     private async Task OnWeekStartChanged(ChangeEventArgs e)
     {

@@ -1,0 +1,28 @@
+@page "/calendar"
+@using Microsoft.AspNetCore.Authorization
+@using blazorWpBooking.Client.Components
+@rendermode InteractiveAuto
+@attribute [Authorize]
+@inject IStringLocalizer<Calendar> Localizer
+
+<PageTitle>@Localizer["Calendar"]</PageTitle>
+
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="mb-4">@Localizer["Calendar"]</h1>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card">
+                <div class="card-body">
+                    <CalendarDisplay />
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+}

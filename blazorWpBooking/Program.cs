@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Localization;
 using System.Globalization;
 using Microsoft.Extensions.Localization;
+using FastEndpoints;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,6 +23,7 @@ builder.Services.AddRazorComponents()
     .AddInteractiveWebAssemblyComponents()
     .AddAuthenticationStateSerialization();
 
+builder.Services.AddFastEndpoints();
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddBlazoredLocalStorage();
@@ -109,6 +111,9 @@ builder.Services.Configure<RequestLocalizationOptions>(options =>
     options.RequestCultureProviders.Insert(1, new CookieRequestCultureProvider());
 });
 
+builder.Services.AddTransient<ApiService>();
+
+
 var app = builder.Build();
 
 // Apply pending migrations on startup in Development only
@@ -154,5 +159,10 @@ app.MapRazorComponents<App>()
 
 // Add additional endpoints required by the Identity /Account Razor components.
 // app.MapAdditionalIdentityEndpoints();
+
+// fastendpoints
+app.UseFastEndpoints();
+
+
 
 app.Run();

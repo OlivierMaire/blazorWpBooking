@@ -1,0 +1,151 @@
+@using System.Globalization
+
+@inject IStringLocalizer<CalendarDisplay> Localizer
+@inject ApiService apiService
+
+<div class="calendar-container">
+    <div class="calendar-header">
+        <button class="btn btn-sm btn-outline-secondary" @onclick="PrevMonth">&lt; @Localizer["Previous"]</button>
+        <div class="calendar-title">
+            <h5 class="mb-0">
+                <select class="form-select form-select-sm d-inline-block w-auto me-2" @onchange="OnMonthChanged"
+                    value="@_displayDate.Month">
+                    @for (int m = 1; m <= 12; m++)
+                    {
+                        <option value="@m">@CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(m)</option>
+                    }
+                </select>
+                <select class="form-select form-select-sm d-inline-block w-auto" @onchange="OnYearChanged"
+                    value="@_displayDate.Year">
+                    @for (int y = _startYear; y <= _endYear; y++)
+                    {
+                        <option value="@y">@y</option>
+                    }
+                </select>
+            </h5>
+        </div>
+        <button class="btn btn-sm btn-outline-secondary" @onclick="NextMonth">@Localizer["Next"] &gt;</button>
+    </div>
+
+    <div class="calendar-grid">
+        <!-- Day headers -->
+        @foreach (var dayName in _dayNames)
+        {
+            <div class="calendar-dayname">@dayName</div>
+        }
+
+        <!-- Calendar cells -->
+        @foreach (var cell in _calendarCells)
+        {
+            var css = "calendar-cell";
+            if (!cell.IsCurrentMonth) css += " other-month";
+            if (cell.IsToday) css += " today";
+
+            <div class="@css">
+                <div class="day-number">@cell.Day</div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private DateTime _displayDate = DateTime.Today;
+    private string[] _dayNames = Array.Empty<string>();
+    private List<CalendarCell> _calendarCells = new();
+
+    private readonly int _startYear;
+    private readonly int _endYear;
+
+    CalendarSetting calendarSetting = new CalendarSetting();
+
+    public CalendarDisplay()
+    {
+
+        var now = DateTime.Today;
+        _startYear = now.Year - 5;
+        _endYear = now.Year + 5;
+        @* _dayNames = CultureInfo.CurrentCulture.DateTimeFormat.AbbreviatedDayNames; *@
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        calendarSetting = await apiService.GetAsync<CalendarSetting>("api/calendar/settings") ?? new CalendarSetting
+        {
+            WeekStartsOnSunday = false
+        };
+
+        var now = DateTime.Today;
+        _dayNames = CultureInfo.CurrentCulture.DateTimeFormat.AbbreviatedDayNames;
+        List<DayOfWeek>? orderedDays = calendarSetting.WeekStartsOnSunday
+        ? Enum.GetValues<DayOfWeek>().Cast<DayOfWeek>().ToList()
+        : Enum.GetValues<DayOfWeek>().Cast<DayOfWeek>().Skip(1).Concat(new[] { DayOfWeek.Sunday }).ToList();
+
+        _dayNames = orderedDays.Select(d => CultureInfo.CurrentCulture.DateTimeFormat.GetAbbreviatedDayName(d)).ToArray();
+
+
+        BuildCalendar();
+    }
+
+    private void PrevMonth()
+    {
+        _displayDate = _displayDate.AddMonths(-1);
+        BuildCalendar();
+    }
+
+    private void NextMonth()
+    {
+        _displayDate = _displayDate.AddMonths(1);
+        BuildCalendar();
+    }
+
+    private Task OnMonthChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int m))
+        {
+            _displayDate = new DateTime(_displayDate.Year, m, 1);
+            BuildCalendar();
+        }
+        return Task.CompletedTask;
+    }
+
+    private Task OnYearChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int y))
+        {
+            _displayDate = new DateTime(y, _displayDate.Month, 1);
+            BuildCalendar();
+        }
+        return Task.CompletedTask;
+    }
+
+    private void BuildCalendar()
+    {
+        _calendarCells.Clear();
+
+        var firstOfMonth = new DateTime(_displayDate.Year, _displayDate.Month, 1);
+        var firstDayOfWeek = calendarSetting.WeekStartsOnSunday ? DayOfWeek.Sunday : DayOfWeek.Monday;
+        var diff = (7 + (firstOfMonth.DayOfWeek - firstDayOfWeek)) % 7;
+        var startDate = firstOfMonth.AddDays(-diff);
+
+        // Generate 42 cells (6 weeks × 7 days)
+        for (int i = 0; i < 42; i++)
+        {
+            var d = startDate.AddDays(i);
+            _calendarCells.Add(new CalendarCell
+            {
+                Date = d,
+                Day = d.Day,
+                IsCurrentMonth = d.Month == _displayDate.Month,
+                IsToday = d.Date == DateTime.Today
+            });
+        }
+    }
+
+    private record CalendarCell
+    {
+        public DateTime Date { get; init; }
+        public int Day { get; init; }
+        public bool IsCurrentMonth { get; init; }
+        public bool IsToday { get; init; }
+    }
+}

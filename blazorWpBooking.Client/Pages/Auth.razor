@@ -8,17 +8,17 @@
 
 @inject AuthenticationStateProvider AuthStateProvider
 @inject ILocalStorageService _localStorageService
+@inject IStringLocalizer<Auth> Localizer
+
 
 <PageTitle>Auth</PageTitle>
 
 <h1>You are authenticated</h1>
-
+@Localizer["HelloWorld"]
 <AuthorizeView>
     Hello @context.User.Identity?.Name!
     <p>Token: @Token</p>
 </AuthorizeView>
-
-<blazorWpBooking.Client.Components.Calendar></blazorWpBooking.Client.Components.Calendar>
 
 @code {
 
