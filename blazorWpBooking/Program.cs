@@ -90,7 +90,6 @@ builder.Services.AddHttpClient("ApiWithToken")
     .AddHttpMessageHandler<ServerTokenHandler>();
 
 // Application services
-builder.Services.AddScoped<blazorWpBooking.Services.LessonService>();
 builder.Services.AddScoped<blazorWpBooking.Services.LessonTypeService>();
 builder.Services.AddScoped<blazorWpBooking.Services.ScheduleService>();
 builder.Services.AddScoped<blazorWpBooking.Services.LocationService>();

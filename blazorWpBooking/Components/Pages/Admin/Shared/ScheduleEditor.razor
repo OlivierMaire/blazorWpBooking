@@ -2,6 +2,7 @@
 @using blazorWpBooking.Data
 @inject blazorWpBooking.Services.ScheduleService ScheduleService
 @inject blazorWpBooking.Services.LocationService LocationService
+@inject blazorWpBooking.Services.LessonTypeService LessonTypeService
 @inject IJSRuntime Js
 
 <div class="modal fade @( _visible ? "show" : "" )" tabindex="-1" style="display: @( _visible ? "block" : "none" ); background: rgba(0,0,0,0.5);">
@@ -32,6 +33,20 @@
                                 <option value="@loc.Id">@loc.Name</option>
                             }
                         </InputSelect>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Lesson Type</label>
+                        <InputSelect class="form-select" @bind-Value="_editModel.LessonTypeId">
+                            <option value="">-- none --</option>
+                            @foreach (var t in _types)
+                            {
+                                <option value="@t.Id">@t.Name</option>
+                            }
+                        </InputSelect>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">Max Students (0 = unlimited)</label>
+                        <InputNumber class="form-control" @bind-Value="_editModel.MaxStudents" />
                     </div>
                         <div class="row mb-2">
                             <div class="col-md-6">
@@ -92,6 +107,7 @@
     private bool _visible;
     private bool _isEdit;
     private List<Location> _locations = new();
+    private List<blazorWpBooking.Data.LessonType> _types = new();
 
     private ScheduleEditModel _editModel = new();
 
@@ -101,6 +117,7 @@
     protected override async Task OnInitializedAsync()
     {
         _locations = await LocationService.GetLocationsAsync();
+        _types = await LessonTypeService.GetTypesAsync();
     }
 
     public Task ShowCreateAsync()
@@ -138,6 +155,8 @@
             LocationId = item.LocationId,
                 StartDate = item.StartDate,
                 EndDate = item.EndDate,
+                LessonTypeId = item.LessonTypeId,
+                MaxStudents = item.MaxStudents,
             IsRecurring = item.IsRecurring,
             IsPublished = item.IsPublished
         };
@@ -179,6 +198,8 @@
                     TimeSlotFrom = _editModel.TimeSlotFrom,
                     TimeSlotTo = _editModel.TimeSlotTo,
                     LocationId = _editModel.LocationId,
+                    LessonTypeId = _editModel.LessonTypeId,
+                    MaxStudents = _editModel.MaxStudents,
                     StartDate = _editModel.StartDate,
                     EndDate = _editModel.EndDate,
                     IsRecurring = _editModel.IsRecurring,
@@ -200,6 +221,8 @@
                 existing.TimeSlotFrom = _editModel.TimeSlotFrom;
                 existing.TimeSlotTo = _editModel.TimeSlotTo;
                 existing.LocationId = _editModel.LocationId;
+                existing.LessonTypeId = _editModel.LessonTypeId;
+                existing.MaxStudents = _editModel.MaxStudents;
                 existing.SetDaysOfWeek(selectedDays);
                 existing.IsRecurring = _editModel.IsRecurring;
                 existing.IsPublished = _editModel.IsPublished;
@@ -225,6 +248,8 @@
         public TimeOnly? TimeSlotFrom { get; set; }
         public TimeOnly? TimeSlotTo { get; set; }
         public int? LocationId { get; set; }
+        public int? LessonTypeId { get; set; }
+        public int MaxStudents { get; set; }
         public Dictionary<DayOfWeek, bool> SelectedDays { get; set; } = new();
         public bool IsRecurring { get; set; }
         public bool IsPublished { get; set; } = true;

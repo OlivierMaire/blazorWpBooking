@@ -18,6 +18,7 @@ namespace blazorWpBooking.Services
         {
             return await _db.Schedules
                 .Include(s => s.Location)
+                .Include(s => s.LessonType)
                 .AsNoTracking()
                 .ToListAsync();
         }

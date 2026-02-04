@@ -5,7 +5,6 @@ namespace blazorWpBooking.Data;
 
 public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : DbContext(options)
 {
-	public DbSet<Lesson> Lessons { get; set; } = null!;
 	public DbSet<LessonType> LessonTypes { get; set; } = null!;
 	public DbSet<Schedule> Schedules { get; set; } = null!;
 	public DbSet<Location> Locations { get; set; } = null!;
@@ -22,17 +21,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 		base.OnModelCreating(modelBuilder);
 
 		// Configure relationships if needed
-		modelBuilder.Entity<Lesson>()
-			.HasOne(l => l.Type)
-			.WithMany()
-			.HasForeignKey(l => l.TypeId)
-			.OnDelete(DeleteBehavior.SetNull);
-
-		modelBuilder.Entity<Lesson>()
-			.HasOne(l => l.Schedule)
-			.WithMany()
-			.HasForeignKey(l => l.ScheduleId)
-			.OnDelete(DeleteBehavior.SetNull);
+		// Lesson entity removed; related configuration removed
 
 		modelBuilder.Entity<Level>()
 			.HasOne(l => l.Group)

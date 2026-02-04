@@ -40,6 +40,13 @@ namespace blazorWpBooking.Data
         public int? LocationId { get; set; }
 
         public Location? Location { get; set; }
+ 
+        // Link to a default LessonType for this schedule
+        public int? LessonTypeId { get; set; }
+        public LessonType? LessonType { get; set; }
+
+        // Maximum number of students for the schedule (0 = unlimited)
+        public int MaxStudents { get; set; } = 0;
 
         // Helper methods for days of week
         public string GetDaysOfWeekDisplay()

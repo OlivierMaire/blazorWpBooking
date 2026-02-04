@@ -61,23 +61,23 @@
     font-size: 0.95rem;
 }
 
-.calendar-cell.other-month {
+.calendar-cell.other-month, .calendar-cell.day-off {
     background-color: #f9f9f9;
     color: #999;
 }
 
-.calendar-cell.other-month .day-number {
+.calendar-cell.other-month .day-number, .calendar-cell.day-off .day-number{
     color: #ccc;
 }
 
 .calendar-cell.today {
-    background-color: #0d6efd;
-    color: white;
+    /* background-color: #0d6efd; */
+    /* color: white; */
     border-color: #0d6efd;
 }
 
 .calendar-cell.today .day-number {
-    color: white;
+    /* color: white; */
     font-weight: 700;
 }
 

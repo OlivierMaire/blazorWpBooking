@@ -6,7 +6,7 @@
 @inject blazorWpBooking.Services.ScheduleService ScheduleService
 @inject blazorWpBooking.Services.LocationService LocationService
 @inject IJSRuntime Js
-@inject IStringLocalizer<blazorWpBooking.Resources.SharedResource> Localizer
+@inject IStringLocalizer<blazorWpBooking.Shared.Resources.SharedResource> Localizer
 
 @rendermode InteractiveServer
 
@@ -24,6 +24,8 @@
         <tr>
             <th>Name</th>
             <th>Location</th>
+            <th>Lesson Type</th>
+            <th>Max Students</th>
             <th>Description</th>
             <th>Time Slot</th>
             <th>Days</th>
@@ -41,6 +43,8 @@
                 <td>@schedule.Name</td>
                 <td>@schedule.Location?.Name</td>
                 <td>@schedule.Description</td>
+                <td>@schedule.LessonType?.Name</td>
+                <td>@(schedule.MaxStudents == 0 ? "Unlimited" : schedule.MaxStudents.ToString())</td>
                 <td>@(schedule.TimeSlotFrom?.ToString("HH:mm") ?? "--") - @(schedule.TimeSlotTo?.ToString("HH:mm") ?? "--")
                 </td>
                 <td>@schedule.GetDaysOfWeekDisplay()</td>
