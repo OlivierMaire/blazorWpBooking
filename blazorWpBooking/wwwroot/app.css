@@ -50,6 +50,70 @@ h1:focus {
     border-color: #929292;
 }
 
+/* Calendar styles */
+.calendar-container {
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 1px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    overflow: hidden;
+    margin-top: 10px;
+}
+
+.calendar-dayname {
+    text-align: center;
+    padding: 10px 0;
+    font-weight: bold;
+    background-color: #f8f9fa;
+    border: 1px solid #ddd;
+}
+
+.calendar-cell {
+    min-height: 80px;
+    padding: 5px;
+    border: 1px solid #ddd;
+    position: relative;
+    background-color: white;
+}
+
+.calendar-cell.other-month {
+    background-color: #f8f9fa;
+    color: #ccc;
+}
+
+.calendar-cell.today {
+    background-color: #e3f2fd;
+    border: 2px solid #2196f3;
+}
+
+.day-number {
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.schedule-indicators {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    max-height: 60px;
+    overflow-y: auto;
+}
+
+.schedule-indicator {
+    font-size: 0.7em;
+    padding: 2px 4px;
+    border-radius: 3px;
+    text-align: center;
+    min-width: 16px;
+    box-sizing: border-box;
+}
+
 .form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
     color: var(--bs-secondary-color);
     text-align: end;

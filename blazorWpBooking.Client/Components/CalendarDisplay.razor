@@ -1,4 +1,5 @@
 @using System.Globalization
+@using blazorWpBooking.Shared.Models
 
 @inject IStringLocalizer<blazorWpBooking.Shared.Resources.SharedResource> Localizer
 @inject ApiService apiService
@@ -42,8 +43,19 @@
             if (cell.IsToday) css += " today";
             if (cell.IsDayOff) css += " day-off";
 
-            <div class="@css">
+            <div class="@css" @onclick="() => OnDayClick(cell)">
                 <div class="day-number">@cell.Day</div>
+                @if (cell.Schedules.Any())
+                {
+                    <div class="schedule-indicators">
+                        @foreach (var schedule in cell.Schedules)
+                        {
+                            <div class="schedule-indicator" style="background-color: @(schedule.LocationColor ?? "#007bff"); color: white; font-size: 0.7em; padding: 2px; margin: 1px; border-radius: 2px;" title="@schedule.Name">
+                                @schedule.Name.Substring(0, 1)
+                            </div>
+                        }
+                    </div>
+                }
             </div>
         }
     </div>
@@ -53,6 +65,7 @@
     private DateTime _displayDate = DateTime.Today;
     private string[] _dayNames = Array.Empty<string>();
     private List<CalendarCell> _calendarCells = new();
+    private List<ScheduleDto> _schedules = new();
 
     private readonly int _startYear;
     private readonly int _endYear;
@@ -74,6 +87,8 @@
         {
             WeekStartsOnSunday = false
         };
+
+        _schedules = await apiService.GetAsync<List<ScheduleDto>>(Shared.EndpointsUrl.Schedules.GetSchedules) ?? new List<ScheduleDto>();
 
         var now = DateTime.Today;
         _dayNames = CultureInfo.CurrentCulture.DateTimeFormat.AbbreviatedDayNames;
@@ -132,7 +147,7 @@
         for (int i = 0; i < 42; i++)
         {
             var d = startDate.AddDays(i);
-            _calendarCells.Add(new CalendarCell
+            var cell = new CalendarCell
             {
                 Date = d,
                 Day = d.Day,
@@ -142,19 +157,72 @@
                             calendarSetting.SaturdaysOff && d.DayOfWeek == DayOfWeek.Saturday ||
                            calendarSetting.SpecialDates.Any(sd => sd.Date.Date == d.Date && sd.IsDayOff)) &&
                            !calendarSetting.SpecialDates.Any(sd => sd.Date.Date == d.Date && !sd.IsDayOff)
-            });
+            };
+
+            // Add schedules for this day
+            cell.Schedules = _schedules.Where(s => IsScheduleActiveOnDay(s, d)).ToList();
+
+            _calendarCells.Add(cell);
         }
     }
 
-    private record CalendarCell
+    private bool IsScheduleActiveOnDay(ScheduleDto schedule, DateTime day)
     {
-        public DateTime Date { get; init; }
-        public int Day { get; init; }
-        public bool IsCurrentMonth { get; init; }
-        public bool IsToday { get; init; }
+        // If schedule is not published, it's not active
+        if (!schedule.IsPublished)
+            return false;
+
+        // Check if the day is within the schedule's date range (if specified)
+        if (schedule.StartDate.HasValue && day.Date < schedule.StartDate.Value.Date)
+            return false;
+        if (schedule.EndDate.HasValue && day.Date > schedule.EndDate.Value.Date)
+            return false;
+
+        // If schedule is not recurring, check if it's the exact day
+        if (!schedule.IsRecurring)
+        {
+            // For non-recurring schedules, we need to check if the day matches the schedule's days of week
+            if (string.IsNullOrEmpty(schedule.DaysOfWeek))
+                return false;
+
+            var daysOfWeek = schedule.DaysOfWeek.Split(',').Select(d => int.Parse(d)).ToList();
+            var dayOfWeek = (int)day.DayOfWeek;
+            // Adjust for Sunday=0 to Monday=1, etc. (as in the database)
+            if (dayOfWeek == 0) dayOfWeek = 7; // Sunday = 7 in database
+
+            return daysOfWeek.Contains(dayOfWeek);
+        }
+        else
+        {
+            // For recurring schedules, check if the day of week matches
+            if (string.IsNullOrEmpty(schedule.DaysOfWeek))
+                return false;
+
+            var daysOfWeek = schedule.DaysOfWeek.Split(',').Select(d => int.Parse(d)).ToList();
+            var dayOfWeek = (int)day.DayOfWeek;
+            // Adjust for Sunday=0 to Monday=1, etc. (as in the database)
+            if (dayOfWeek == 0) dayOfWeek = 7; // Sunday = 7 in database
+
+            return daysOfWeek.Contains(dayOfWeek);
+        }
+    }
+
+    private void OnDayClick(CalendarCell cell)
+    {
+        // Handle day click if needed
+        Console.WriteLine($"Clicked on day {cell.Day} with {cell.Schedules.Count} schedules");
+    }
+
+    private class CalendarCell
+    {
+        public DateTime Date { get; set; }
+        public int Day { get; set; }
+        public bool IsCurrentMonth { get; set; }
+        public bool IsToday { get; set; }
 
         public bool IsEnabled => IsCurrentMonth && !IsDayOff;
 
-        public bool IsDayOff { get; init; }
+        public bool IsDayOff { get; set; }
+        public List<ScheduleDto> Schedules { get; set; } = new();
     }
 }
